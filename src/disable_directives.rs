@@ -157,4 +157,62 @@ eval("code"); // purets-disable-line no-eval
         assert!(directives.is_line_disabled(1)); // First console.log line
         assert!(directives.is_rule_disabled(2, "no-eval")); // eval line with specific rule
     }
+
+    #[test]
+    fn test_multiple_rules_disable() {
+        let source = r#"
+// purets-disable-next-line no-console, allow-directives, no-eval
+console.log(eval("test"));
+"#;
+        let directives = DisableDirectives::from_source(source);
+        
+        assert!(directives.is_rule_disabled(2, "no-console"));
+        assert!(directives.is_rule_disabled(2, "allow-directives"));
+        assert!(directives.is_rule_disabled(2, "no-eval"));
+        assert!(!directives.is_rule_disabled(2, "other-rule"));
+    }
+
+    #[test]
+    fn test_disable_affects_correct_line() {
+        let source = r#"
+console.log("line 1");
+// purets-disable-next-line
+console.log("line 3");
+console.log("line 4");
+"#;
+        let directives = DisableDirectives::from_source(source);
+        
+        assert!(!directives.is_line_disabled(1)); // Line 1 not disabled
+        assert!(directives.is_line_disabled(3)); // Line 3 is disabled
+        assert!(!directives.is_line_disabled(4)); // Line 4 not disabled
+    }
+
+    #[test]
+    fn test_file_disable_overrides_all() {
+        let source = r#"
+// purets-disable-file
+// purets-disable-next-line no-console
+console.log("test");
+document.body;
+"#;
+        let directives = DisableDirectives::from_source(source);
+        
+        assert!(directives.file_disabled);
+        assert!(directives.is_line_disabled(3)); // All lines disabled
+        assert!(directives.is_line_disabled(4)); // All lines disabled
+        assert!(directives.is_rule_disabled(3, "any-rule")); // Any rule disabled
+    }
+
+    #[test]
+    fn test_inline_disable_same_line() {
+        let source = r#"
+const x = eval("code"); // purets-disable-line no-eval
+const y = eval("code"); // Not disabled
+"#;
+        let directives = DisableDirectives::from_source(source);
+        
+        assert!(directives.is_rule_disabled(1, "no-eval"));
+        assert!(!directives.is_rule_disabled(1, "other-rule"));
+        assert!(!directives.is_rule_disabled(2, "no-eval"));
+    }
 }

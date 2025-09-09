@@ -400,4 +400,78 @@ mod tests {
         assert!(errors.iter().any(|e| e.contains("'RequestInit' requires '@allow net'")));
         assert!(errors.iter().any(|e| e.contains("'Response' requires '@allow net'")));
     }
+
+    #[test]
+    fn test_unused_allow_directives() {
+        let source = r#"
+            /**
+             * @allow dom
+             * @allow console
+             */
+            function calculate(a: number, b: number): number {
+                return a + b;
+            }
+        "#;
+        let errors = parse_and_check(source);
+        assert_eq!(errors.len(), 2);
+        assert!(errors.iter().any(|e| e.contains("Unused '@allow dom' directive")));
+        assert!(errors.iter().any(|e| e.contains("Unused '@allow console' directive")));
+    }
+
+    #[test]
+    fn test_used_allow_directives() {
+        let source = r#"
+            /**
+             * @allow console
+             */
+            function debug() {
+                console.log("test");
+            }
+        "#;
+        let errors = parse_and_check(source);
+        // Should not have unused directive error
+        assert!(!errors.iter().any(|e| e.contains("Unused '@allow console'")));
+    }
+
+    #[test]
+    fn test_partial_used_allow() {
+        let source = r#"
+            /**
+             * @allow console
+             * @allow dom
+             * @allow net
+             */
+            function test() {
+                console.log("test");
+                // dom and net are not used
+            }
+        "#;
+        let errors = parse_and_check(source);
+        assert!(errors.iter().any(|e| e.contains("Unused '@allow dom' directive")));
+        assert!(errors.iter().any(|e| e.contains("Unused '@allow net' directive")));
+        assert!(!errors.iter().any(|e| e.contains("Unused '@allow console'")));
+    }
+
+    #[test]
+    fn test_all_allow_features() {
+        let source = r#"
+            /**
+             * @allow console
+             * @allow dom
+             * @allow net
+             * @allow timers
+             */
+            async function testAll() {
+                console.log("test");
+                document.getElementById("app");
+                await fetch("/api");
+                setTimeout(() => {}, 1000);
+            }
+        "#;
+        let errors = parse_and_check(source);
+        // Should not have any unused directive errors
+        assert!(!errors.iter().any(|e| e.contains("Unused '@allow")));
+        // Should not have any access errors
+        assert!(!errors.iter().any(|e| e.contains("requires '@allow")));
+    }
 }
