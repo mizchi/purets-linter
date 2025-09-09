@@ -37,6 +37,8 @@ pub mod no_dynamic_access;
 pub mod max_function_params;
 pub mod no_require;
 pub mod no_global_process;
+pub mod node_import_style;
+pub mod forbidden_libraries;
 
 pub use no_classes::check_no_classes;
 pub use no_enums::check_no_enums;
@@ -76,3 +78,5 @@ pub use no_dynamic_access::check_no_dynamic_access;
 pub use max_function_params::check_max_function_params;
 pub use no_require::check_no_require;
 pub use no_global_process::check_no_global_process;
+pub use node_import_style::check_node_import_style;
+pub use forbidden_libraries::check_forbidden_libraries;

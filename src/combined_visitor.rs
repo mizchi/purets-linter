@@ -346,6 +346,40 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                     "require() is not allowed. Use ES6 import statements instead".to_string(),
                     call.span,
                 );
+                
+                // Also check forbidden libraries in require
+                if call.arguments.len() > 0 {
+                    if let Argument::StringLiteral(lit) = &call.arguments[0] {
+                        let source = lit.value.as_str();
+                        
+                        const FORBIDDEN_LIBRARIES: &[&str] = &[
+                            "jquery", "lodash", "lodash/fp", "underscore", "rxjs",
+                        ];
+                        
+                        const PREFER_ALTERNATIVES: &[(&str, &str)] = &[
+                            ("minimist", "node:util parseArgs"),
+                            ("yargs", "node:util parseArgs"),
+                        ];
+                        
+                        if FORBIDDEN_LIBRARIES.contains(&source) || source.starts_with("lodash/") {
+                            self.linter.add_error(
+                                "forbidden-libraries".to_string(),
+                                format!("Library '{}' is forbidden. Consider using modern alternatives", source),
+                                call.span,
+                            );
+                        }
+                        
+                        for (lib, alternative) in PREFER_ALTERNATIVES {
+                            if source == *lib {
+                                self.linter.add_error(
+                                    "forbidden-libraries".to_string(),
+                                    format!("Library '{}' has a better alternative. Use '{}' instead", lib, alternative),
+                                    call.span,
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
         
@@ -401,23 +435,115 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         oxc_ast::visit::walk::walk_ts_interface_declaration(self, decl);
     }
     
-    // Check for namespace imports, import extensions, and HTTP imports
+    // Check for namespace imports, import extensions, HTTP imports, Node.js import style, and forbidden libraries
     fn visit_import_declaration(&mut self, import: &ImportDeclaration<'a>) {
-        // Check namespace imports
-        if let Some(specifiers) = &import.specifiers {
-            for spec in specifiers {
-                if matches!(spec, ImportDeclarationSpecifier::ImportNamespaceSpecifier(_)) {
-                    self.linter.add_error(
-                        "no-namespace-imports".to_string(),
-                        "Namespace imports are not allowed. Use named imports instead".to_string(),
-                        import.span,
-                    );
-                    break;
-                }
+        let source = &import.source.value;
+        
+        // Forbidden libraries
+        const FORBIDDEN_LIBRARIES: &[&str] = &[
+            "jquery", "lodash", "lodash/fp", "underscore", "rxjs",
+        ];
+        
+        // Libraries with better alternatives
+        const PREFER_ALTERNATIVES: &[(&str, &str)] = &[
+            ("minimist", "node:util parseArgs"),
+            ("yargs", "node:util parseArgs"),
+        ];
+        
+        // Check for forbidden libraries
+        if FORBIDDEN_LIBRARIES.contains(&source.as_str()) || source.starts_with("lodash/") {
+            self.linter.add_error(
+                "forbidden-libraries".to_string(),
+                format!("Library '{}' is forbidden. Consider using modern alternatives", source),
+                import.span,
+            );
+        }
+        
+        // Check for libraries with better alternatives
+        for (lib, alternative) in PREFER_ALTERNATIVES {
+            if source == *lib {
+                self.linter.add_error(
+                    "forbidden-libraries".to_string(),
+                    format!("Library '{}' has a better alternative. Use '{}' instead", lib, alternative),
+                    import.span,
+                );
             }
         }
         
-        let source = &import.source.value;
+        // Node.js built-in modules list
+        const NODE_BUILTINS: &[&str] = &[
+            "assert", "async_hooks", "buffer", "child_process", "cluster", "console",
+            "constants", "crypto", "dgram", "diagnostics_channel", "dns", "domain",
+            "events", "fs", "http", "http2", "https", "inspector", "module", "net",
+            "os", "path", "perf_hooks", "process", "punycode", "querystring",
+            "readline", "repl", "stream", "string_decoder", "sys", "timers", "tls",
+            "trace_events", "tty", "url", "util", "v8", "vm", "wasi", "worker_threads", "zlib"
+        ];
+        
+        // Check if it's a Node.js built-in without node: prefix
+        if NODE_BUILTINS.contains(&source.as_str()) {
+            self.linter.add_error(
+                "node-import-style".to_string(),
+                format!(
+                    "Node.js built-in '{}' must be imported with 'node:' prefix. Use 'node:{}' instead",
+                    source, source
+                ),
+                import.span,
+            );
+        }
+        
+        // Check for modules that should use promises version
+        const PREFER_PROMISES: &[(&str, &str)] = &[
+            ("fs", "fs/promises"),
+            ("dns", "dns/promises"),
+            ("stream", "stream/promises"),
+            ("timers", "timers/promises"),
+            ("readline", "readline/promises"),
+        ];
+        
+        for (old, new) in PREFER_PROMISES {
+            if source == *old || source == format!("node:{}", old).as_str() {
+                self.linter.add_error(
+                    "node-import-style".to_string(),
+                    format!("Prefer promise-based API. Use 'node:{}' instead of '{}'", new, source),
+                    import.span,
+                );
+                break;
+            }
+        }
+        
+        // Check namespace imports from node: modules
+        if source.starts_with("node:") {
+            if let Some(specifiers) = &import.specifiers {
+                for spec in specifiers {
+                    if matches!(spec, ImportDeclarationSpecifier::ImportNamespaceSpecifier(_)) {
+                        self.linter.add_error(
+                            "node-import-style".to_string(),
+                            format!(
+                                "Use named imports instead of namespace import from '{}'. Example: import {{ readFile }} from '{}'",
+                                source, source
+                            ),
+                            import.span,
+                        );
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Check general namespace imports (not from node:)
+            if let Some(specifiers) = &import.specifiers {
+                for spec in specifiers {
+                    if matches!(spec, ImportDeclarationSpecifier::ImportNamespaceSpecifier(_)) {
+                        self.linter.add_error(
+                            "no-namespace-imports".to_string(),
+                            "Namespace imports are not allowed. Use named imports instead".to_string(),
+                            import.span,
+                        );
+                        break;
+                    }
+                }
+            }
+        }
         
         // Check HTTP(S) imports
         if source.starts_with("http://") || source.starts_with("https://") {
