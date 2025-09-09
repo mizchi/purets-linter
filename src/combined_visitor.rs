@@ -109,6 +109,13 @@ impl<'a> CombinedVisitor<'a> {
                 oxc_span::Span::new(0, 0),
             );
         }
+        if self.allowed_features.throws && !self.used_features.throws {
+            self.linter.add_error(
+                "allow-directives".to_string(),
+                "Unused '@allow throws' directive".to_string(),
+                oxc_span::Span::new(0, 0),
+            );
+        }
     }
     
     fn collect_imports(&mut self, program: &'a Program<'a>) {

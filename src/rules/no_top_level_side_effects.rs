@@ -3,10 +3,25 @@ use oxc_ast::ast::*;
 use oxc_span::GetSpan;
 
 pub fn check_no_top_level_side_effects(linter: &mut Linter, program: &Program) {
+    // Allow main() calls in main.ts files
+    let path_str = linter.path.to_str().unwrap_or("");
+    let is_main_file = path_str.ends_with("/main.ts") || 
+                       path_str.ends_with("\\main.ts") || 
+                       path_str == "main.ts";
+    
+    if linter.verbose && is_main_file {
+        eprintln!("DEBUG: Detected main.ts file: {}", path_str);
+    }
+    
     for item in &program.body {
         match item {
             Statement::ExpressionStatement(expr_stmt) => match &expr_stmt.expression {
                 Expression::CallExpression(call) => {
+                    // Allow main() calls in main.ts
+                    if is_main_file && is_main_function_call(call) {
+                        continue;
+                    }
+                    
                     if !is_iife(call) {
                         linter.add_error(
                             "no-top-level-side-effects".to_string(),
@@ -72,6 +87,13 @@ fn is_iife(call: &CallExpression) -> bool {
                 Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
             )
         }
+        _ => false,
+    }
+}
+
+fn is_main_function_call(call: &CallExpression) -> bool {
+    match &call.callee {
+        Expression::Identifier(id) => id.name == "main",
         _ => false,
     }
 }

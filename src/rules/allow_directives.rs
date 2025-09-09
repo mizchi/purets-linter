@@ -9,6 +9,7 @@ pub struct AllowedFeatures {
     pub console: bool,
     pub net: bool,
     pub dom: bool,
+    pub throws: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -17,6 +18,7 @@ pub struct UsedFeatures {
     pub console: bool,
     pub net: bool,
     pub dom: bool,
+    pub throws: bool,
 }
 
 impl AllowedFeatures {
@@ -43,6 +45,7 @@ impl AllowedFeatures {
                             "console" => features.console = true,
                             "net" => features.net = true,
                             "dom" => features.dom = true,
+                            "throws" => features.throws = true,
                             _ => {}
                         }
                     }
@@ -172,6 +175,59 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
             }
             
             oxc_ast::visit::walk::walk_call_expression(self, call);
+        }
+        
+        fn visit_throw_statement(&mut self, throw_stmt: &ThrowStatement<'b>) {
+            // Check if throw is allowed
+            if !self.allowed.throws {
+                // Check if it's throwing an Error constructor
+                if let Expression::NewExpression(new_expr) = &throw_stmt.argument {
+                    if let Expression::Identifier(id) = &new_expr.callee {
+                        let name = id.name.as_str();
+                        if name.ends_with("Error") {
+                            self.linter.add_error(
+                                "allow-directives".to_string(),
+                                format!("Throwing '{}' requires '@allow throws' directive", name),
+                                throw_stmt.span,
+                            );
+                        }
+                    }
+                } else {
+                    self.linter.add_error(
+                        "allow-directives".to_string(),
+                        "Throw statements require '@allow throws' directive".to_string(),
+                        throw_stmt.span,
+                    );
+                }
+            } else {
+                self.used.throws = true;
+                
+                // Check that only Error types are thrown
+                if let Expression::NewExpression(new_expr) = &throw_stmt.argument {
+                    if let Expression::Identifier(id) = &new_expr.callee {
+                        let name = id.name.as_str();
+                        if !name.ends_with("Error") {
+                            self.linter.add_error(
+                                "allow-directives".to_string(),
+                                format!("Only Error types can be thrown (got '{}')", name),
+                                throw_stmt.span,
+                            );
+                        }
+                    }
+                } else if !matches!(&throw_stmt.argument, Expression::Identifier(_)) {
+                    // Allow throwing identifiers (like: throw error;)
+                    // But disallow throwing literals or other expressions
+                    if !matches!(&throw_stmt.argument, Expression::Identifier(_)) {
+                        self.linter.add_error(
+                            "allow-directives".to_string(),
+                            "Only Error instances can be thrown".to_string(),
+                            throw_stmt.span,
+                        );
+                    }
+                }
+            }
+            
+            oxc_ast::visit::walk::walk_throw_statement(self, throw_stmt);
         }
         
         fn visit_ts_type_reference(&mut self, type_ref: &TSTypeReference<'b>) {

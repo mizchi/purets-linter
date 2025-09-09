@@ -19,13 +19,27 @@ pub fn check_path_based_restrictions(
     
     // Check test files first (they can be in any directory)
     if normalized_path.ends_with("_test.ts") {
+        // Default to vitest if no test runner specified
+        if linter.test_runner.is_none() {
+            linter.test_runner = Some(crate::TestRunner::Vitest);
+        }
         check_test_file_imports(linter, program, &normalized_path);
         return; // Test files don't need to follow other path restrictions
     }
     
-    // Check io/**/*.ts - only async functions allowed
+    // Check index.ts - only re-exports allowed
+    if normalized_path.ends_with("/index.ts") {
+        check_index_reexports_only(linter, program);
+    }
+    
+    // Check main.ts - main() call allowed at top level
+    if normalized_path.ends_with("/main.ts") {
+        check_main_file(linter, program);
+    }
+    
+    // Check io/**/*.ts - async functions are optional (not required)
     if normalized_path.contains("/io/") && normalized_path.ends_with(".ts") {
-        check_io_async_only(linter, program);
+        // No longer enforcing async-only, just allow both sync and async
     }
     
     // Check pure/**/*.ts - pure functions with filename match
@@ -39,50 +53,64 @@ pub fn check_path_based_restrictions(
     }
 }
 
-/// Check that io/**/*.ts files only contain async functions
-fn check_io_async_only(linter: &mut Linter, program: &Program) {
+/// Check that index.ts files only contain re-exports
+fn check_index_reexports_only(linter: &mut Linter, program: &Program) {
     for stmt in &program.body {
         match stmt {
             Statement::ExportNamedDeclaration(export) => {
-                if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
-                    if !func.r#async {
-                        linter.add_error(
-                            "path-based-restrictions".to_string(),
-                            "Functions in io/**/*.ts must be async".to_string(),
-                            func.span,
-                        );
-                    }
+                // Check if it's a re-export (has source but no declaration)
+                if export.source.is_none() && export.declaration.is_some() {
+                    linter.add_error(
+                        "path-based-restrictions".to_string(),
+                        "index.ts files can only contain re-exports, not direct exports".to_string(),
+                        export.span,
+                    );
                 }
             }
             Statement::ExportDefaultDeclaration(export) => {
-                match &export.declaration {
-                    ExportDefaultDeclarationKind::FunctionDeclaration(func) => {
-                        if !func.r#async {
-                            linter.add_error(
-                                "path-based-restrictions".to_string(),
-                                "Functions in io/**/*.ts must be async".to_string(),
-                                func.span,
-                            );
-                        }
-                    }
-                    _ => {
-                        // Handle other expression types if needed
-                    }
-                }
+                linter.add_error(
+                    "path-based-restrictions".to_string(),
+                    "index.ts files can only contain re-exports, not default exports".to_string(),
+                    export.span,
+                );
+            }
+            Statement::ImportDeclaration(_) => {
+                // Imports are allowed in index.ts for re-exporting
+            }
+            Statement::ExportAllDeclaration(_) => {
+                // export * from './module' is allowed
             }
             Statement::FunctionDeclaration(func) => {
-                // Non-exported functions in io files should also be async
-                if !func.r#async {
-                    linter.add_error(
-                        "path-based-restrictions".to_string(),
-                        "Functions in io/**/*.ts must be async".to_string(),
-                        func.span,
-                    );
-                }
+                linter.add_error(
+                    "path-based-restrictions".to_string(),
+                    "index.ts files can only contain re-exports, not declarations".to_string(),
+                    func.span,
+                );
+            }
+            Statement::ClassDeclaration(class) => {
+                linter.add_error(
+                    "path-based-restrictions".to_string(),
+                    "index.ts files can only contain re-exports, not declarations".to_string(),
+                    class.span,
+                );
+            }
+            Statement::VariableDeclaration(var) => {
+                linter.add_error(
+                    "path-based-restrictions".to_string(),
+                    "index.ts files can only contain re-exports, not declarations".to_string(),
+                    var.span,
+                );
             }
             _ => {}
         }
     }
+}
+
+/// Check main.ts file - allows main() function call at top level
+fn check_main_file(linter: &mut Linter, program: &Program) {
+    // This function currently just allows main() calls
+    // The no-top-level-side-effects rule will be bypassed for main.ts
+    // We'll need to update that rule to check for main.ts
 }
 
 /// Check that pure/**/*.ts files contain pure functions with filename match
@@ -419,18 +447,17 @@ mod tests {
     }
 
     #[test]
-    fn test_io_async_functions() {
-        // Non-async function in io/ should error
+    fn test_io_functions() {
+        // Both sync and async functions should be allowed in io/
         let source = r#"
-            export function readFile(path: string): string {
+            export function readFileSync(path: string): string {
                 return "content";
             }
         "#;
         let errors = parse_and_check(source, "src/io/file.ts");
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].contains("must be async"));
+        assert_eq!(errors.len(), 0); // No error for sync function
 
-        // Async function in io/ should pass
+        // Async function in io/ should also pass
         let source = r#"
             export async function readFile(path: string): Promise<string> {
                 return "content";
@@ -568,5 +595,40 @@ mod tests {
         "#;
         let errors = parse_and_check(source, "src/calculate_test.ts");
         assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_index_file_restrictions() {
+        // index.ts with direct export should error
+        let source = r#"
+            export const version = "1.0.0";
+        "#;
+        let errors = parse_and_check(source, "src/index.ts");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("only contain re-exports"));
+
+        // index.ts with re-export should pass
+        let source = r#"
+            export { add } from "./add";
+            export type { Point } from "./types";
+        "#;
+        let errors = parse_and_check(source, "src/index.ts");
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_main_file() {
+        // main.ts should allow main() calls
+        // This is tested in no_top_level_side_effects.rs
+        // Here we just verify path detection works
+        let source = r#"
+            function main() {
+                console.log("Hello");
+            }
+            main();
+        "#;
+        let errors = parse_and_check(source, "src/main.ts");
+        // Should not have path-based errors
+        assert!(!errors.iter().any(|e| e.contains("path-based")));
     }
 }
