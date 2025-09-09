@@ -4,6 +4,22 @@ use oxc_ast::Visit;
 use crate::Linter;
 
 pub fn check_no_classes(linter: &mut Linter, program: &Program) {
+    // Allow classes in io/errors/*.ts for error definitions
+    let path_str = linter.path.to_str().unwrap_or("");
+    let normalized_path = path_str.replace('\\', "/");
+    
+    // Debug output
+    if linter.verbose {
+        eprintln!("DEBUG no-classes: Checking path: {}", normalized_path);
+    }
+    
+    if normalized_path.contains("/io/errors/") {
+        if linter.verbose {
+            eprintln!("DEBUG no-classes: Skipping class check for error definitions");
+        }
+        return; // Skip class checking for error definitions
+    }
+    
     struct ClassChecker<'a> {
         linter: &'a mut Linter,
     }

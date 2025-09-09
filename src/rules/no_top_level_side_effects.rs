@@ -22,6 +22,11 @@ pub fn check_no_top_level_side_effects(linter: &mut Linter, program: &Program) {
                         continue;
                     }
                     
+                    // Allow Deno.test() calls in test files when using deno-test runner
+                    if is_deno_test_call(call) && linter.test_runner == Some(crate::TestRunner::DenoTest) {
+                        continue;
+                    }
+                    
                     if !is_iife(call) {
                         linter.add_error(
                             "no-top-level-side-effects".to_string(),
@@ -94,6 +99,19 @@ fn is_iife(call: &CallExpression) -> bool {
 fn is_main_function_call(call: &CallExpression) -> bool {
     match &call.callee {
         Expression::Identifier(id) => id.name == "main",
+        _ => false,
+    }
+}
+
+fn is_deno_test_call(call: &CallExpression) -> bool {
+    match &call.callee {
+        Expression::StaticMemberExpression(member) => {
+            if let Expression::Identifier(obj) = &member.object {
+                obj.name == "Deno" && member.property.name == "test"
+            } else {
+                false
+            }
+        }
         _ => false,
     }
 }

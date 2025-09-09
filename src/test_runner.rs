@@ -33,6 +33,10 @@ impl TestRunner {
             TestRunner::DenoTest => vec![
                 "deno.land/std/testing",
                 "deno.land/std/assert",
+                "@std/expect",
+                "@std/assert",
+                "jsr:@std/expect",
+                "jsr:@std/assert",
             ],
         }
     }

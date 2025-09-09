@@ -1,4 +1,5 @@
-import { promises as fs } from "fs";
+import fs from "node:fs/promises";
+import { FileNotFoundError } from "./errors/FileNotFoundError.ts";
 
 /**
  * @allow throws
@@ -6,8 +7,8 @@ import { promises as fs } from "fs";
  * This can be either sync or async in io/
  */
 export function readFileSync(path: string): string {
-  // Simulated sync read
-  throw new Error("Not implemented");
+  // Simulated sync read - throws custom error
+  throw new FileNotFoundError(path);
 }
 
 /**
@@ -18,6 +19,6 @@ export async function readFile(path: string): Promise<string> {
   try {
     return await fs.readFile(path, "utf-8");
   } catch (error) {
-    throw new Error(`Failed to read file: ${path}`);
+    throw new FileNotFoundError(path);
   }
 }

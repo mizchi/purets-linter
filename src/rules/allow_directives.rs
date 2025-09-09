@@ -202,11 +202,17 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
             } else {
                 self.used.throws = true;
                 
-                // Check that only Error types are thrown
+                // Check that only custom Error types are thrown (not plain Error)
                 if let Expression::NewExpression(new_expr) = &throw_stmt.argument {
                     if let Expression::Identifier(id) = &new_expr.callee {
                         let name = id.name.as_str();
-                        if !name.ends_with("Error") {
+                        if name == "Error" {
+                            self.linter.add_error(
+                                "allow-directives".to_string(),
+                                "Cannot throw plain Error. Define a custom error class in io/errors/*.ts".to_string(),
+                                throw_stmt.span,
+                            );
+                        } else if !name.ends_with("Error") {
                             self.linter.add_error(
                                 "allow-directives".to_string(),
                                 format!("Only Error types can be thrown (got '{}')", name),
@@ -216,14 +222,11 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                     }
                 } else if !matches!(&throw_stmt.argument, Expression::Identifier(_)) {
                     // Allow throwing identifiers (like: throw error;)
-                    // But disallow throwing literals or other expressions
-                    if !matches!(&throw_stmt.argument, Expression::Identifier(_)) {
-                        self.linter.add_error(
-                            "allow-directives".to_string(),
-                            "Only Error instances can be thrown".to_string(),
-                            throw_stmt.span,
-                        );
-                    }
+                    self.linter.add_error(
+                        "allow-directives".to_string(),
+                        "Only Error instances can be thrown".to_string(),
+                        throw_stmt.span,
+                    );
                 }
             }
             

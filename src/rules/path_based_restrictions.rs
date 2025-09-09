@@ -39,6 +39,10 @@ pub fn check_path_based_restrictions(
     
     // Check io/**/*.ts - async functions are optional (not required)
     if normalized_path.contains("/io/") && normalized_path.ends_with(".ts") {
+        // Check io/errors/*.ts - custom error classes allowed
+        if normalized_path.contains("/io/errors/") {
+            check_error_class_definitions(linter, program, &normalized_path);
+        }
         // No longer enforcing async-only, just allow both sync and async
     }
     
@@ -107,10 +111,73 @@ fn check_index_reexports_only(linter: &mut Linter, program: &Program) {
 }
 
 /// Check main.ts file - allows main() function call at top level
-fn check_main_file(linter: &mut Linter, program: &Program) {
+fn check_main_file(_linter: &mut Linter, _program: &Program) {
     // This function currently just allows main() calls
     // The no-top-level-side-effects rule will be bypassed for main.ts
     // We'll need to update that rule to check for main.ts
+}
+
+/// Check io/errors/*.ts files - must define error class matching filename
+fn check_error_class_definitions(linter: &mut Linter, program: &Program, file_path: &str) {
+    // Extract filename without extension
+    let filename = file_path
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(".ts");
+    
+    let mut found_matching_class = false;
+    
+    for stmt in &program.body {
+        match stmt {
+            Statement::ExportNamedDeclaration(export) => {
+                if let Some(Declaration::ClassDeclaration(class)) = &export.declaration {
+                    if let Some(id) = &class.id {
+                        let class_name = id.name.as_str();
+                        
+                        // Check if class name matches filename
+                        if class_name == filename {
+                            found_matching_class = true;
+                            
+                            // Check if it extends Error
+                            if let Some(super_class) = &class.super_class {
+                                if let Expression::Identifier(super_id) = super_class {
+                                    if super_id.name != "Error" {
+                                        linter.add_error(
+                                            "path-based-restrictions".to_string(),
+                                            format!("Error class '{}' must extend Error", class_name),
+                                            class.span,
+                                        );
+                                    }
+                                }
+                            } else {
+                                linter.add_error(
+                                    "path-based-restrictions".to_string(),
+                                    format!("Error class '{}' must extend Error", class_name),
+                                    class.span,
+                                );
+                            }
+                        } else if class_name.ends_with("Error") {
+                            linter.add_error(
+                                "path-based-restrictions".to_string(),
+                                format!("Error class must be named '{}' to match filename", filename),
+                                class.span,
+                            );
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    if !found_matching_class {
+        linter.add_error(
+            "path-based-restrictions".to_string(),
+            format!("io/errors/{}.ts must export error class '{}' extending Error", filename, filename),
+            Span::new(0, 0),
+        );
+    }
 }
 
 /// Check that pure/**/*.ts files contain pure functions with filename match
