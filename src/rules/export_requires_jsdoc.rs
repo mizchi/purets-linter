@@ -2,12 +2,13 @@ use oxc_ast::ast::*;
 
 use crate::Linter;
 
-pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program) {
+pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program, file_path: &str) {
     use oxc_ast::Visit;
     
     struct JsDocVisitor<'a, 'b> {
         linter: &'a mut Linter,
         source_text: String,
+        file_path: String,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
     
@@ -51,16 +52,54 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program) {
         }
         
         fn visit_export_named_declaration(&mut self, export: &ExportNamedDeclaration<'b>) {
-            if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
-                if !self.has_jsdoc_before(export.span) {
-                    let name = func.id.as_ref()
-                        .map(|id| id.name.as_str())
-                        .unwrap_or("anonymous");
-                    self.linter.add_error(
-                        "export-requires-jsdoc".to_string(),
-                        format!("Exported function '{}' must have a JSDoc comment", name),
-                        export.span,
-                    );
+            if let Some(declaration) = &export.declaration {
+                match declaration {
+                    Declaration::FunctionDeclaration(func) => {
+                        if !self.has_jsdoc_before(export.span) {
+                            let name = func.id.as_ref()
+                                .map(|id| id.name.as_str())
+                                .unwrap_or("anonymous");
+                            self.linter.add_error(
+                                "export-requires-jsdoc".to_string(),
+                                format!("Exported function '{}' must have a JSDoc comment", name),
+                                export.span,
+                            );
+                        }
+                    }
+                    Declaration::TSTypeAliasDeclaration(type_alias) => {
+                        // Check if in types/*.ts
+                        if (self.file_path.contains("/types/") || self.file_path.contains("types/")) && !self.has_jsdoc_before(export.span) {
+                            self.linter.add_error(
+                                "export-requires-jsdoc".to_string(),
+                                format!("Exported type '{}' must have a JSDoc comment", type_alias.id.name.as_str()),
+                                export.span,
+                            );
+                        }
+                    }
+                    Declaration::TSInterfaceDeclaration(interface) => {
+                        // Check if in types/*.ts
+                        if (self.file_path.contains("/types/") || self.file_path.contains("types/")) && !self.has_jsdoc_before(export.span) {
+                            self.linter.add_error(
+                                "export-requires-jsdoc".to_string(),
+                                format!("Exported interface '{}' must have a JSDoc comment", interface.id.name.as_str()),
+                                export.span,
+                            );
+                        }
+                    }
+                    Declaration::ClassDeclaration(class) => {
+                        // Check if in errors/*Error.ts
+                        if (self.file_path.contains("/errors/") || self.file_path.contains("errors/")) && self.file_path.ends_with("Error.ts") && !self.has_jsdoc_before(export.span) {
+                            let name = class.id.as_ref()
+                                .map(|id| id.name.as_str())
+                                .unwrap_or("anonymous");
+                            self.linter.add_error(
+                                "export-requires-jsdoc".to_string(),
+                                format!("Exported error class '{}' must have a JSDoc comment", name),
+                                export.span,
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
             
@@ -73,6 +112,7 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program) {
     let mut visitor = JsDocVisitor {
         linter,
         source_text,
+        file_path: file_path.to_string(),
         _phantom: std::marker::PhantomData,
     };
     
@@ -94,7 +134,7 @@ mod tests {
         let ret = Parser::new(&allocator, source, source_type).parse();
         
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
-        check_export_requires_jsdoc(&mut linter, &ret.program);
+        check_export_requires_jsdoc(&mut linter, &ret.program, "test.ts");
         
         linter.errors.into_iter().map(|e| e.message).collect()
     }
@@ -151,5 +191,133 @@ mod tests {
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("must have a JSDoc comment"));
+    }
+
+    #[test]
+    fn test_type_with_jsdoc() {
+        let source = r#"
+            /**
+             * Represents a user in the system
+             */
+            export type User = {
+                id: string;
+                name: string;
+            };
+        "#;
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(Path::new("types/User.ts")).unwrap();
+        let ret = Parser::new(&allocator, source, source_type).parse();
+        
+        let mut linter = Linter::new(Path::new("types/User.ts"), source, false);
+        check_export_requires_jsdoc(&mut linter, &ret.program, "types/User.ts");
+        
+        let errors: Vec<String> = linter.errors.into_iter().map(|e| e.message).collect();
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_type_without_jsdoc() {
+        let source = r#"
+            export type User = {
+                id: string;
+                name: string;
+            };
+        "#;
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(Path::new("types/User.ts")).unwrap();
+        let ret = Parser::new(&allocator, source, source_type).parse();
+        
+        let mut linter = Linter::new(Path::new("types/User.ts"), source, false);
+        check_export_requires_jsdoc(&mut linter, &ret.program, "types/User.ts");
+        
+        let errors: Vec<String> = linter.errors.into_iter().map(|e| e.message).collect();
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Exported type 'User' must have a JSDoc comment"));
+    }
+
+    #[test]
+    fn test_interface_with_jsdoc() {
+        let source = r#"
+            /**
+             * Configuration interface
+             */
+            export interface Config {
+                port: number;
+                host: string;
+            }
+        "#;
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(Path::new("types/Config.ts")).unwrap();
+        let ret = Parser::new(&allocator, source, source_type).parse();
+        
+        let mut linter = Linter::new(Path::new("types/Config.ts"), source, false);
+        check_export_requires_jsdoc(&mut linter, &ret.program, "types/Config.ts");
+        
+        let errors: Vec<String> = linter.errors.into_iter().map(|e| e.message).collect();
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_interface_without_jsdoc() {
+        let source = r#"
+            export interface Config {
+                port: number;
+                host: string;
+            }
+        "#;
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(Path::new("types/Config.ts")).unwrap();
+        let ret = Parser::new(&allocator, source, source_type).parse();
+        
+        let mut linter = Linter::new(Path::new("types/Config.ts"), source, false);
+        check_export_requires_jsdoc(&mut linter, &ret.program, "types/Config.ts");
+        
+        let errors: Vec<String> = linter.errors.into_iter().map(|e| e.message).collect();
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Exported interface 'Config' must have a JSDoc comment"));
+    }
+
+    #[test]
+    fn test_error_class_with_jsdoc() {
+        let source = r#"
+            /**
+             * Error thrown when file is not found
+             */
+            export class FileNotFoundError extends Error {
+                constructor(path: string) {
+                    super(`File not found: ${path}`);
+                }
+            }
+        "#;
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(Path::new("errors/FileNotFoundError.ts")).unwrap();
+        let ret = Parser::new(&allocator, source, source_type).parse();
+        
+        let mut linter = Linter::new(Path::new("errors/FileNotFoundError.ts"), source, false);
+        check_export_requires_jsdoc(&mut linter, &ret.program, "errors/FileNotFoundError.ts");
+        
+        let errors: Vec<String> = linter.errors.into_iter().map(|e| e.message).collect();
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_error_class_without_jsdoc() {
+        let source = r#"
+            export class FileNotFoundError extends Error {
+                constructor(path: string) {
+                    super(`File not found: ${path}`);
+                }
+            }
+        "#;
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(Path::new("errors/FileNotFoundError.ts")).unwrap();
+        let ret = Parser::new(&allocator, source, source_type).parse();
+        
+        let mut linter = Linter::new(Path::new("errors/FileNotFoundError.ts"), source, false);
+        check_export_requires_jsdoc(&mut linter, &ret.program, "errors/FileNotFoundError.ts");
+        
+        let errors: Vec<String> = linter.errors.into_iter().map(|e| e.message).collect();
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Exported error class 'FileNotFoundError' must have a JSDoc comment"));
     }
 }

@@ -1313,6 +1313,7 @@ pub fn check_program_combined(linter: &mut Linter, program: &Program) {
         check_no_top_level_side_effects,
         check_path_based_restrictions,
         check_no_classes,
+        check_export_requires_jsdoc,
     };
     
     // Check if it's a test file or error class file
@@ -1337,4 +1338,7 @@ pub fn check_program_combined(linter: &mut Linter, program: &Program) {
     
     // Apply path-based restrictions
     check_path_based_restrictions(linter, program, &path_str);
+    
+    // Apply JSDoc requirements
+    check_export_requires_jsdoc(linter, program, &path_str);
 }

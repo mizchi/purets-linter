@@ -10,7 +10,7 @@
   },
   "scripts": {
     "check": "pnpm typecheck && pnpm lint:purets",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo",
     "lint:purets": "purets",
     "build": "tsdown",
     "test": "vitest --run",
