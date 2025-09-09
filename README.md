@@ -28,6 +28,167 @@ purets ./src
 purets --test vitest
 ```
 
+## Expected Directory Structure
+
+The linter expects and enforces the following directory structure:
+
+```
+project/
+├── src/
+│   ├── index.ts          # Main entry point (optional)
+│   ├── types/            # Type definitions only
+│   │   ├── User.ts       # Pure type exports
+│   │   └── Config.ts     # Interface definitions
+│   ├── pure/             # Pure functions without side effects
+│   │   ├── math.ts       # Mathematical operations
+│   │   ├── transform.ts  # Data transformations
+│   │   └── validate.ts   # Validation logic
+│   ├── io/               # I/O operations and side effects
+│   │   ├── api.ts        # API calls
+│   │   ├── database.ts   # Database operations
+│   │   └── file.ts       # File system operations
+│   └── lib/              # Library modules
+│       └── utils.ts      # Utility functions
+├── tests/                # Test files
+│   └── *.test.ts
+└── package.json
+```
+
+### Directory Rules
+
+- **`src/types/`**: Only type definitions, interfaces, and type aliases. No runtime code.
+- **`src/pure/`**: Pure functions only. No I/O, no side effects, no global state access, no async.
+- **`src/io/`**: All I/O operations and side effects must be isolated here.
+- **Files starting with `_`**: Private implementation files, not meant for export.
+
+## Sample Code
+
+### Type Definitions (`src/types/User.ts`)
+
+```typescript
+/**
+ * User data structure
+ * @interface User
+ */
+export interface User {
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+  readonly createdAt: Date;
+}
+
+// Type aliases must have explicit types
+export type UserId = string;
+export type UserList = readonly User[];
+```
+
+### Pure Functions (`src/pure/userTransform.ts`)
+
+```typescript
+import type { User } from "../types/User";
+
+/**
+ * Transform user data for display
+ * @param {User} user - The user object
+ * @returns {string} Formatted user name
+ */
+export const formatUserName = (user: User): string => {
+  return `${user.name} <${user.email}>`;
+};
+
+/**
+ * Filter active users
+ * @param {readonly User[]} users - List of users
+ * @param {Date} since - Date threshold
+ * @returns {readonly User[]} Filtered users
+ */
+export const filterActiveUsers = (
+  users: readonly User[],
+  since: Date
+): readonly User[] => {
+  return users.filter(user => user.createdAt > since);
+};
+
+// Named export matching filename
+export { filterActiveUsers as userTransform };
+```
+
+### I/O Operations (`src/io/userApi.ts`)
+
+```typescript
+import type { User } from "../types/User";
+
+// @allow throws
+// @allow timers
+// @allow console
+
+/**
+ * Fetch user from API
+ * @param {string} id - User ID
+ * @returns {Promise<User>} User data
+ * @throws {Error} When user not found
+ */
+export const fetchUser = async (id: string): Promise<User> => {
+  const response = await fetch(`/api/users/${id}`);
+  
+  if (!response.ok) {
+    throw new Error(`User not found: ${id}`);
+  }
+  
+  return response.json() as Promise<User>;
+};
+
+// Named export matching filename
+export { fetchUser as userApi };
+```
+
+### Main Entry (`src/index.ts`)
+
+```typescript
+import type { User } from "./types/User";
+import { filterActiveUsers } from "./pure/userTransform";
+import { fetchUser } from "./io/userApi";
+
+/**
+ * Main application entry point
+ */
+async function main(): Promise<void> {
+  // All async operations must be handled
+  const user = await fetchUser("123");
+  console.log(user);
+}
+
+// Named export matching filename
+export { main as index };
+
+// Only execute if this is the main module
+if (import.meta.main) {
+  main().catch(console.error);
+}
+```
+
+### Error Handling Pattern
+
+```typescript
+// Instead of throwing errors, return Result types
+export type Result<T, E = Error> = 
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: E };
+
+/**
+ * Parse JSON safely
+ * @param {string} json - JSON string
+ * @returns {Result<unknown>} Parsed result
+ */
+export const parseJSON = (json: string): Result<unknown> => {
+  try {
+    return { ok: true, value: JSON.parse(json) };
+  } catch (error) {
+    return { ok: false, error: error as Error };
+  }
+};
+```
+
 ## Features
 
 ### Zero Configuration
