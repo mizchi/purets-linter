@@ -103,10 +103,10 @@ mod tests {
         
         let errors = check_package_json(temp_dir.path());
         assert_eq!(errors.len(), 4);
-        assert!(errors[0].contains("jquery"));
-        assert!(errors[1].contains("lodash"));
-        assert!(errors[2].contains("underscore"));
-        assert!(errors[3].contains("rxjs"));
+        assert!(errors.iter().any(|e| e.contains("jquery")));
+        assert!(errors.iter().any(|e| e.contains("lodash")));
+        assert!(errors.iter().any(|e| e.contains("underscore")));
+        assert!(errors.iter().any(|e| e.contains("rxjs")));
     }
 
     #[test]
@@ -145,9 +145,9 @@ mod tests {
         
         let errors = check_package_json(temp_dir.path());
         assert_eq!(errors.len(), 3);
-        assert!(errors[0].contains("lodash.debounce"));
-        assert!(errors[1].contains("lodash.merge"));
-        assert!(errors[2].contains("lodash-es"));
+        assert!(errors.iter().any(|e| e.contains("lodash.debounce")));
+        assert!(errors.iter().any(|e| e.contains("lodash.merge")));
+        assert!(errors.iter().any(|e| e.contains("lodash-es")));
     }
 
     #[test]

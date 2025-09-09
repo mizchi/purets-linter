@@ -11,15 +11,12 @@ pub fn check_no_constant_condition(linter: &mut Linter, program: &Program) {
     
     impl<'a> Visit<'a> for ConstantConditionChecker<'a> {
         fn visit_if_statement(&mut self, stmt: &IfStatement<'a>) {
-            match &stmt.test {
-                Expression::BooleanLiteral(bool_lit) => {
-                    self.linter.add_error(
-                        "no-constant-condition".to_string(),
-                        format!("if ({}) is not allowed. Constant conditions are banned", bool_lit.value),
-                        stmt.span,
-                    );
-                }
-                _ => {}
+            if let Expression::BooleanLiteral(bool_lit) = &stmt.test {
+                self.linter.add_error(
+                    "no-constant-condition".to_string(),
+                    format!("if ({}) is not allowed. Constant conditions are banned", bool_lit.value),
+                    stmt.span,
+                );
             }
             
             walk::walk_if_statement(self, stmt);

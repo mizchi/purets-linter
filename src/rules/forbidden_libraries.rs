@@ -55,7 +55,7 @@ pub fn check_forbidden_libraries(linter: &mut Linter, program: &Program) {
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
             // Check for require() calls
             if let Expression::Identifier(ident) = &call.callee {
-                if ident.name == "require" && call.arguments.len() > 0 {
+                if ident.name == "require" && !call.arguments.is_empty() {
                     if let Argument::StringLiteral(lit) = &call.arguments[0] {
                         let source = lit.value.as_str();
                         

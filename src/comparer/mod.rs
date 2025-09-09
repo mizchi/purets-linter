@@ -58,11 +58,9 @@ fn collect_ts_files(dir: &Path) -> Result<Vec<std::path::PathBuf>> {
     let pattern = format!("{}/**/*.{{ts,tsx}}", dir.display());
     let mut files = Vec::new();
     
-    for entry in glob(&pattern)? {
-        if let Ok(path) = entry {
-            if !path.to_string_lossy().contains("node_modules") {
-                files.push(path);
-            }
+    for path in (glob(&pattern)?).flatten() {
+        if !path.to_string_lossy().contains("node_modules") {
+            files.push(path);
         }
     }
     

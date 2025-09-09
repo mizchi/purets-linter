@@ -1,8 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use pure_ts::Linter;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use oxc_allocator::Allocator;
 use oxc_parser::Parser;
 use oxc_span::SourceType;
+use purets::Linter;
 use std::path::Path;
 
 const SMALL_CODE: &str = r#"
@@ -151,7 +151,7 @@ export { OrderService, Product, Order, OrderItem, OrderStatus };
 
 fn benchmark_linter(c: &mut Criterion) {
     let mut group = c.benchmark_group("linter");
-    
+
     for (name, code) in &[
         ("small", SMALL_CODE),
         ("medium", MEDIUM_CODE),
@@ -162,19 +162,19 @@ fn benchmark_linter(c: &mut Criterion) {
                 let allocator = Allocator::default();
                 let source_type = SourceType::from_path("test.ts").unwrap();
                 let ret = Parser::new(&allocator, code, source_type).parse();
-                
+
                 let mut linter = Linter::new(Path::new("test.ts"), code, false);
                 linter.check_program(black_box(&ret.program));
             });
         });
     }
-    
+
     group.finish();
 }
 
 fn benchmark_parse_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_only");
-    
+
     for (name, code) in &[
         ("small", SMALL_CODE),
         ("medium", MEDIUM_CODE),
@@ -188,7 +188,7 @@ fn benchmark_parse_only(c: &mut Criterion) {
             });
         });
     }
-    
+
     group.finish();
 }
 

@@ -67,15 +67,14 @@ pub fn check_jsdoc_param_match(linter: &mut Linter, program: &Program) {
                     }
                     
                     // Check if JSDoc exists for this parameter
-                    if !jsdoc_params.is_empty() {
-                        if !jsdoc_params.iter().any(|(name, _)| name == param_name) {
+                    if !jsdoc_params.is_empty()
+                        && !jsdoc_params.iter().any(|(name, _)| name == param_name) {
                             self.linter.add_error(
                                 "jsdoc-param-missing".to_string(),
                                 format!("JSDoc @param tag missing for parameter '{}' in function '{}'", param_name, func_name),
                                 param.span,
                             );
                         }
-                    }
                 }
             }
             

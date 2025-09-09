@@ -1,0 +1,29 @@
+{
+  "name": "my-pure-ts-project",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "check": "pnpm typecheck && pnpm lint:purets",
+    "typecheck": "tsgo",
+    "lint:purets": "purets .",
+    "build": "tsdown",
+    "test": "vitest --run",
+    "dev": "node src/main.ts"
+  },
+  "dependencies": {
+    "neverthrow": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "@typescript/native-preview": "7.0.0-dev.20250909.1",
+    "tsdown": "^0.15.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

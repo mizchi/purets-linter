@@ -12,17 +12,14 @@ pub fn check_no_foreach(linter: &mut Linter, program: &Program) {
     impl<'a> Visit<'a> for ForEachChecker<'a> {
         fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
             // Check if this is a .forEach() call
-            match &call.callee {
-                Expression::StaticMemberExpression(member) => {
-                    if member.property.name == "forEach" {
-                        self.linter.add_error(
-                            "no-foreach".to_string(),
-                            "forEach is not allowed in pure TypeScript subset. Use for-of loop instead".to_string(),
-                            call.span,
-                        );
-                    }
+            if let Expression::StaticMemberExpression(member) = &call.callee {
+                if member.property.name == "forEach" {
+                    self.linter.add_error(
+                        "no-foreach".to_string(),
+                        "forEach is not allowed in pure TypeScript subset. Use for-of loop instead".to_string(),
+                        call.span,
+                    );
                 }
-                _ => {}
             }
             
             walk::walk_call_expression(self, call);

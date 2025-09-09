@@ -12,7 +12,13 @@ pub mod package_checker;
 pub mod disable_directives;
 pub mod expect_error_directives;
 pub mod test_runner;
+pub mod test_runner_detector;
 pub mod presets;
+pub mod init;
+pub mod workspace_detector;
+pub mod gitignore_filter;
+#[cfg(test)]
+pub mod test_utils;
 mod tsconfig_validator;
 mod package_json_validator;
 

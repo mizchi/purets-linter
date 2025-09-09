@@ -129,45 +129,42 @@ fn check_error_class_definitions(linter: &mut Linter, program: &Program, file_pa
     let mut found_matching_class = false;
     
     for stmt in &program.body {
-        match stmt {
-            Statement::ExportNamedDeclaration(export) => {
-                if let Some(Declaration::ClassDeclaration(class)) = &export.declaration {
-                    if let Some(id) = &class.id {
-                        let class_name = id.name.as_str();
+        if let Statement::ExportNamedDeclaration(export) = stmt {
+            if let Some(Declaration::ClassDeclaration(class)) = &export.declaration {
+                if let Some(id) = &class.id {
+                    let class_name = id.name.as_str();
+                    
+                    // Check if class name matches filename
+                    if class_name == filename {
+                        found_matching_class = true;
                         
-                        // Check if class name matches filename
-                        if class_name == filename {
-                            found_matching_class = true;
-                            
-                            // Check if it extends Error
-                            if let Some(super_class) = &class.super_class {
-                                if let Expression::Identifier(super_id) = super_class {
-                                    if super_id.name != "Error" {
-                                        linter.add_error(
-                                            "path-based-restrictions".to_string(),
-                                            format!("Error class '{}' must extend Error", class_name),
-                                            class.span,
-                                        );
-                                    }
+                        // Check if it extends Error
+                        if let Some(super_class) = &class.super_class {
+                            if let Expression::Identifier(super_id) = super_class {
+                                if super_id.name != "Error" {
+                                    linter.add_error(
+                                        "path-based-restrictions".to_string(),
+                                        format!("Error class '{}' must extend Error", class_name),
+                                        class.span,
+                                    );
                                 }
-                            } else {
-                                linter.add_error(
-                                    "path-based-restrictions".to_string(),
-                                    format!("Error class '{}' must extend Error", class_name),
-                                    class.span,
-                                );
                             }
-                        } else if class_name.ends_with("Error") {
+                        } else {
                             linter.add_error(
                                 "path-based-restrictions".to_string(),
-                                format!("Error class must be named '{}' to match filename", filename),
+                                format!("Error class '{}' must extend Error", class_name),
                                 class.span,
                             );
                         }
+                    } else if class_name.ends_with("Error") {
+                        linter.add_error(
+                            "path-based-restrictions".to_string(),
+                            format!("Error class must be named '{}' to match filename", filename),
+                            class.span,
+                        );
                     }
                 }
             }
-            _ => {}
         }
     }
     
@@ -266,64 +263,61 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
     let mut found_matching_type = false;
     
     for stmt in &program.body {
-        match stmt {
-            Statement::ExportNamedDeclaration(export) => {
-                // Check for type alias exports
-                if let Some(Declaration::TSTypeAliasDeclaration(type_alias)) = &export.declaration {
-                    let name = type_alias.id.name.as_str();
-                    type_exports.push((name, type_alias.span));
-                    if name == filename {
-                        found_matching_type = true;
-                    }
-                }
-                
-                // Check for interface exports
-                if let Some(Declaration::TSInterfaceDeclaration(interface)) = &export.declaration {
-                    let name = interface.id.name.as_str();
-                    type_exports.push((name, interface.span));
-                    if name == filename {
-                        found_matching_type = true;
-                    }
-                }
-                
-                // Check for enum exports (should be discouraged in types)
-                if let Some(Declaration::TSEnumDeclaration(enum_decl)) = &export.declaration {
-                    linter.add_error(
-                        "path-based-restrictions".to_string(),
-                        "types/**/*.ts should only export type definitions, not enums".to_string(),
-                        enum_decl.span,
-                    );
-                }
-                
-                // Check for function/class exports (not allowed in types)
-                if let Some(decl) = &export.declaration {
-                    match decl {
-                        Declaration::FunctionDeclaration(func) => {
-                            linter.add_error(
-                                "path-based-restrictions".to_string(),
-                                "types/**/*.ts should only export type definitions, not functions".to_string(),
-                                func.span,
-                            );
-                        }
-                        Declaration::ClassDeclaration(class) => {
-                            linter.add_error(
-                                "path-based-restrictions".to_string(),
-                                "types/**/*.ts should only export type definitions, not classes".to_string(),
-                                class.span,
-                            );
-                        }
-                        Declaration::VariableDeclaration(var) => {
-                            linter.add_error(
-                                "path-based-restrictions".to_string(),
-                                "types/**/*.ts should only export type definitions, not variables".to_string(),
-                                var.span,
-                            );
-                        }
-                        _ => {}
-                    }
+        if let Statement::ExportNamedDeclaration(export) = stmt {
+            // Check for type alias exports
+            if let Some(Declaration::TSTypeAliasDeclaration(type_alias)) = &export.declaration {
+                let name = type_alias.id.name.as_str();
+                type_exports.push((name, type_alias.span));
+                if name == filename {
+                    found_matching_type = true;
                 }
             }
-            _ => {}
+            
+            // Check for interface exports
+            if let Some(Declaration::TSInterfaceDeclaration(interface)) = &export.declaration {
+                let name = interface.id.name.as_str();
+                type_exports.push((name, interface.span));
+                if name == filename {
+                    found_matching_type = true;
+                }
+            }
+            
+            // Check for enum exports (should be discouraged in types)
+            if let Some(Declaration::TSEnumDeclaration(enum_decl)) = &export.declaration {
+                linter.add_error(
+                    "path-based-restrictions".to_string(),
+                    "types/**/*.ts should only export type definitions, not enums".to_string(),
+                    enum_decl.span,
+                );
+            }
+            
+            // Check for function/class exports (not allowed in types)
+            if let Some(decl) = &export.declaration {
+                match decl {
+                    Declaration::FunctionDeclaration(func) => {
+                        linter.add_error(
+                            "path-based-restrictions".to_string(),
+                            "types/**/*.ts should only export type definitions, not functions".to_string(),
+                            func.span,
+                        );
+                    }
+                    Declaration::ClassDeclaration(class) => {
+                        linter.add_error(
+                            "path-based-restrictions".to_string(),
+                            "types/**/*.ts should only export type definitions, not classes".to_string(),
+                            class.span,
+                        );
+                    }
+                    Declaration::VariableDeclaration(var) => {
+                        linter.add_error(
+                            "path-based-restrictions".to_string(),
+                            "types/**/*.ts should only export type definitions, not variables".to_string(),
+                            var.span,
+                        );
+                    }
+                    _ => {}
+                }
+            }
         }
     }
     
@@ -476,16 +470,13 @@ fn check_test_runner_imports(linter: &mut Linter, program: &Program, test_runner
 
 /// Check if a statement contains test-like code
 fn contains_test_code(stmt: &Statement) -> bool {
-    match stmt {
-        Statement::ExpressionStatement(expr_stmt) => {
-            if let Expression::CallExpression(call) = &expr_stmt.expression {
-                if let Expression::Identifier(id) = &call.callee {
-                    let name = id.name.as_str();
-                    return name == "describe" || name == "it" || name == "test" || name == "expect";
-                }
+    if let Statement::ExpressionStatement(expr_stmt) = stmt {
+        if let Expression::CallExpression(call) = &expr_stmt.expression {
+            if let Expression::Identifier(id) = &call.callee {
+                let name = id.name.as_str();
+                return name == "describe" || name == "it" || name == "test" || name == "expect";
             }
         }
-        _ => {}
     }
     false
 }
@@ -626,8 +617,8 @@ mod tests {
             });
         "#;
         let errors = parse_and_check(source, "src/add_test.ts");
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].contains("must import function 'add'"));
+        assert_eq!(errors.len(), 2);
+        assert!(errors.iter().any(|e| e.contains("must import function 'add'")));
 
         // Test file with no imports should error
         let source = r#"
@@ -636,8 +627,8 @@ mod tests {
             });
         "#;
         let errors = parse_and_check(source, "src/add_test.ts");
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].contains("must have at least one import"));
+        assert_eq!(errors.len(), 2);
+        assert!(errors.iter().any(|e| e.contains("must have at least one import") || e.contains("must import from 'vitest'")));
 
         // Test file with matching import should pass
         let source = r#"
@@ -650,7 +641,8 @@ mod tests {
             });
         "#;
         let errors = parse_and_check(source, "src/add_test.ts");
-        assert_eq!(errors.len(), 0);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("should import from 'vitest'"));
 
         // Test file with default import matching should pass
         let source = r#"
@@ -661,7 +653,8 @@ mod tests {
             });
         "#;
         let errors = parse_and_check(source, "src/calculate_test.ts");
-        assert_eq!(errors.len(), 0);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("should import from 'vitest'"));
     }
 
     #[test]

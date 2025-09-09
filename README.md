@@ -1,10 +1,43 @@
-# pure-ts
+# Pure TypeScript Linter
 
-An extremely opinionated TypeScript linter. Implements a radical ruleset designed for AI-assisted development, prioritizing mechanical naming and file organization over conventional coding standards.
+An extremely opinionated TypeScript linter for functional immutable style.
+
+Implements a radical ruleset designed for AI-assisted development, prioritizing mechanical naming and file organization over conventional coding standards.
 
 Focuses on mechanical naming conventions, strict file organization, and code discoverability.
 
+## Installation
+
+```bash
+cargo install --git https://github.com/mizchi/purets-linter
+```
+
+## Usage
+
+```bash
+# Create a new project
+purets new my-project
+
+# Check current directory (auto-detects workspace and test runner)
+purets
+
+# Check specific directory
+purets ./src
+
+# Specify test runner explicitly
+purets --test vitest
+```
+
 ## Features
+
+### Zero Configuration
+
+- **Auto-detection** - Automatically detects monorepo workspaces (pnpm, npm, yarn)
+- **Test Runner Detection** - Automatically detects test runner (Vitest, Node.js test, Deno)
+- **Gitignore Support** - Respects .gitignore patterns and excludes build artifacts
+- **Smart Defaults** - Works out of the box without any configuration
+
+## Core Features
 
 ### Strict Ruleset
 
@@ -17,40 +50,16 @@ Focuses on mechanical naming conventions, strict file organization, and code dis
 
 ### File Structure Conventions
 
-- `pure/` - Pure functions only, no async operations
-- `types/` - Type definitions only, multiple exports allowed
-- `io/` - I/O operations, sync-only allowed
+- `src/pure/` - Pure functions only, no async operations
+- `src/types/` - Type definitions only, multiple exports allowed
+- `src/io/` - I/O operations, sync-only allowed
+- `tests/*_test.ts`
 
 ### Naming Conventions
 
 - **Function-Filename Match** - Export function name must match filename
 - **Required JSDoc** - Exported functions require documentation
 - **Parameter Limits** - Maximum 3 function parameters
-
-## Installation
-
-```bash
-cargo install --path .
-```
-
-## Usage
-
-```bash
-# Check file or directory
-pure-ts ./src
-
-# Also validate tsconfig.json
-pure-ts --validate-tsconfig ./src
-
-# Show detailed errors
-pure-ts --verbose ./src
-
-# Compare code (evaluate quality before/after refactoring)
-pure-ts compare before.ts after.ts
-
-# Specify test runner
-pure-ts --test vitest ./src
-```
 
 ## Rules
 

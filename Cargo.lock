@@ -765,7 +765,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pure-ts"
+name = "purets"
 version = "0.1.0"
 dependencies = [
  "anyhow",

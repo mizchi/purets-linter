@@ -32,7 +32,7 @@ pub fn check_no_reexports(linter: &mut Linter, program: &Program) {
                         export.span,
                     );
                 }
-                Statement::ExportNamedDeclaration(export) => {
+                Statement::ExportNamedDeclaration(_export) => {
                     // Named re-exports are allowed in entry points
                     // Additional validation could be added here for:
                     // - Function name matching

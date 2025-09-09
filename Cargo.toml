@@ -1,35 +1,35 @@
 [package]
-name = "pure-ts"
-version = "0.1.0"
 edition = "2021"
+name = "purets"
+version = "0.1.0"
 
 [lib]
-name = "pure_ts"
+name = "purets"
 path = "src/lib.rs"
 
 [[bin]]
-name = "pure-ts"
+name = "purets"
 path = "src/main.rs"
 
 [dependencies]
-oxc_parser = "0.30.0"
-oxc_ast = "0.30.0"
-oxc_span = "0.30.0"
-oxc_allocator = "0.30.0"
-oxc_diagnostics = "0.30.0"
-oxc_syntax = "0.30.0"
-clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
-glob = "0.3"
+clap = {version = "4.5", features = ["derive"]}
 colored = "2.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+glob = "0.3"
+oxc_allocator = "0.30.0"
+oxc_ast = "0.30.0"
+oxc_diagnostics = "0.30.0"
+oxc_parser = "0.30.0"
+oxc_span = "0.30.0"
+oxc_syntax = "0.30.0"
 rayon = "1.10"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
 tempfile = "3.8"
 
 [dev-dependencies]
 criterion = "0.5"
 
 [[bench]]
-name = "linter_bench"
 harness = false
+name = "linter_bench"

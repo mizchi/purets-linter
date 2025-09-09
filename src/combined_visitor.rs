@@ -72,7 +72,7 @@ impl<'a> CombinedVisitor<'a> {
         crate::rules::check_path_based_restrictions(self.linter, program, &file_path);
         
         // Check filename-function match
-        self.check_filename_function_match(program);
+        // Filename function match is now handled by strict_named_export
         
         // Check JSDoc for exports
         self.check_export_jsdoc(program);
@@ -299,9 +299,7 @@ impl<'a> CombinedVisitor<'a> {
         }
     }
     
-    fn check_filename_function_match(&mut self, _program: &'a Program<'a>) {
-        // Filename-function match is now handled by the individual rule
-    }
+    // Removed: check_filename_function_match - now handled by strict_named_export
     
     fn check_export_jsdoc(&mut self, program: &'a Program<'a>) {
         let source_text = self.linter.source_text.clone();
@@ -484,13 +482,13 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                     
                     // Check for side-effect functions (Math.random, Date.now) - always disallow
                     if self.in_function && !self.in_default_parameter {
-                        if (obj.name == "Math" && method_name == "random") {
+                        if obj.name == "Math" && method_name == "random" {
                             self.linter.add_error(
                                 "no-side-effect-functions".to_string(),
                                 "Direct use of 'Math.random()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
                                 call.span,
                             );
-                        } else if (obj.name == "Date" && method_name == "now") {
+                        } else if obj.name == "Date" && method_name == "now" {
                             self.linter.add_error(
                                 "no-side-effect-functions".to_string(),
                                 "Direct use of 'Date.now()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
@@ -531,7 +529,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 );
                 
                 // Also check forbidden libraries in require
-                if call.arguments.len() > 0 {
+                if !call.arguments.is_empty() {
                     if let Argument::StringLiteral(lit) = &call.arguments[0] {
                         let source = lit.value.as_str();
                         
@@ -668,7 +666,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
     
     // Check for interfaces without extends (interface-extends-only rule)
     fn visit_ts_interface_declaration(&mut self, decl: &TSInterfaceDeclaration<'a>) {
-        if decl.extends.is_none() || decl.extends.as_ref().map_or(true, |e| e.is_empty()) {
+        if decl.extends.is_none() || decl.extends.as_ref().is_none_or(|e| e.is_empty()) {
             self.linter.add_error(
                 "interface-extends-only".to_string(),
                 format!(
@@ -801,8 +799,8 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         }
         
         // Check import extensions - require .ts extension for TypeScript files
-        if source.starts_with('.') || source.starts_with("../") {
-            if !source.ends_with(".ts") && !source.ends_with(".tsx") 
+        if (source.starts_with('.') || source.starts_with("../"))
+            && !source.ends_with(".ts") && !source.ends_with(".tsx") 
                 && !source.ends_with(".js") && !source.ends_with(".jsx") 
                 && !source.ends_with(".json") {
                 self.linter.add_error(
@@ -811,7 +809,6 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                     import.span,
                 );
             }
-        }
         
         oxc_ast::visit::walk::walk_import_declaration(self, import);
     }
@@ -950,20 +947,23 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 };
                 
                 // Skip top-level side effects check for test files and main/entry files
-                let path_str = self.linter.path.to_str().unwrap_or("").replace('\\', "/");
-                let filename = self.linter.path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("");
-                let is_test_file = path_str.contains("_test.ts") || path_str.contains(".test.ts");
-                let is_main_or_entry = filename == "main" || filename == "index" || 
-                                       self.linter.is_entry_point || self.linter.is_main_entry;
-                
-                if !is_iife && !is_test_file && !is_main_or_entry {
-                    self.linter.add_error(
-                        "no-top-level-side-effects".to_string(),
-                        "Top-level function calls are not allowed (side effects)".to_string(),
-                        stmt.span,
-                    );
+                // Also skip if we're inside a function
+                if !self.in_function {
+                    let path_str = self.linter.path.to_str().unwrap_or("").replace('\\', "/");
+                    let filename = self.linter.path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("");
+                    let is_test_file = path_str.contains("_test.ts") || path_str.contains(".test.ts");
+                    let is_main_or_entry = filename == "main" || filename == "index" || 
+                                           self.linter.is_entry_point || self.linter.is_main_entry;
+                    
+                    if !is_iife && !is_test_file && !is_main_or_entry {
+                        self.linter.add_error(
+                            "no-top-level-side-effects".to_string(),
+                            "Top-level function calls are not allowed (side effects)".to_string(),
+                            stmt.span,
+                        );
+                    }
                 }
                 
                 // Check for unused map
@@ -980,11 +980,14 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 }
             }
             Expression::AssignmentExpression(_) => {
-                self.linter.add_error(
-                    "no-top-level-side-effects".to_string(),
-                    "Top-level assignments are not allowed (side effects)".to_string(),
-                    stmt.span,
-                );
+                // Only check for top-level assignments (not inside functions)
+                if !self.in_function {
+                    self.linter.add_error(
+                        "no-top-level-side-effects".to_string(),
+                        "Top-level assignments are not allowed (side effects)".to_string(),
+                        stmt.span,
+                    );
+                }
             }
             _ => {}
         }
@@ -1307,7 +1310,6 @@ pub fn check_program_combined(linter: &mut Linter, program: &Program) {
     // Run individual rules that need special handling
     use crate::rules::{
         check_strict_named_export,
-        check_filename_function_match,
         check_no_top_level_side_effects,
         check_path_based_restrictions,
         check_no_classes,
@@ -1326,8 +1328,7 @@ pub fn check_program_combined(linter: &mut Linter, program: &Program) {
     // Apply strict_named_export rule (replaces no-named-exports)
     check_strict_named_export(linter, program);
     
-    // Apply filename_function_match rule
-    check_filename_function_match(linter, program);
+    // Filename function match is now handled by strict_named_export
     
     // Apply no-top-level-side-effects rule only for non-test and non-error files
     if !is_test_file && !is_error_file {

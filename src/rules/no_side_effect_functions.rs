@@ -33,7 +33,7 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
             
             // Visit parameters to check for default values
             for param in &func.params.items {
-                if let Some(_) = &param.pattern.type_annotation {
+                if param.pattern.type_annotation.is_some() {
                     // Check default parameter values
                     self.in_default_parameter = true;
                     oxc_ast::visit::walk::walk_formal_parameter(self, param);

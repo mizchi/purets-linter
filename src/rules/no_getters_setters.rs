@@ -35,23 +35,20 @@ pub fn check_no_getters_setters(linter: &mut Linter, program: &Program) {
         fn visit_object_expression(&mut self, obj: &ObjectExpression<'a>) {
             // Check for getters/setters in object literals
             for prop in &obj.properties {
-                match prop {
-                    ObjectPropertyKind::ObjectProperty(prop) => {
-                        if prop.kind == PropertyKind::Get {
-                            self.linter.add_error(
-                                "no-getters".to_string(),
-                                "Getters are not allowed in pure TypeScript subset".to_string(),
-                                prop.span,
-                            );
-                        } else if prop.kind == PropertyKind::Set {
-                            self.linter.add_error(
-                                "no-setters".to_string(),
-                                "Setters are not allowed in pure TypeScript subset".to_string(),
-                                prop.span,
-                            );
-                        }
+                if let ObjectPropertyKind::ObjectProperty(prop) = prop {
+                    if prop.kind == PropertyKind::Get {
+                        self.linter.add_error(
+                            "no-getters".to_string(),
+                            "Getters are not allowed in pure TypeScript subset".to_string(),
+                            prop.span,
+                        );
+                    } else if prop.kind == PropertyKind::Set {
+                        self.linter.add_error(
+                            "no-setters".to_string(),
+                            "Setters are not allowed in pure TypeScript subset".to_string(),
+                            prop.span,
+                        );
                     }
-                    _ => {}
                 }
             }
             

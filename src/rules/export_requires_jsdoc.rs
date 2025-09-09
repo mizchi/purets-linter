@@ -1,5 +1,4 @@
 use oxc_ast::ast::*;
-use oxc_ast::Comment;
 
 use crate::Linter;
 
@@ -22,7 +21,7 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program) {
             let trimmed = text_before.trim_end();
             trimmed.ends_with("*/") && {
                 // Find the start of the comment
-                if let Some(comment_start) = trimmed.rfind("/**") {
+                if let Some(_comment_start) = trimmed.rfind("/**") {
                     // Check if there's only whitespace between comment and function
                     let between = &self.source_text[trimmed.len()..span.start as usize];
                     between.trim().is_empty()
@@ -35,20 +34,17 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program) {
     
     impl<'a, 'b> Visit<'b> for JsDocVisitor<'a, 'b> {
         fn visit_export_default_declaration(&mut self, export: &ExportDefaultDeclaration<'b>) {
-            match &export.declaration {
-                ExportDefaultDeclarationKind::FunctionDeclaration(func) => {
-                    if !self.has_jsdoc_before(export.span) {
-                        let name = func.id.as_ref()
-                            .map(|id| id.name.as_str())
-                            .unwrap_or("anonymous");
-                        self.linter.add_error(
-                            "export-requires-jsdoc".to_string(),
-                            format!("Exported function '{}' must have a JSDoc comment", name),
-                            export.span,
-                        );
-                    }
+            if let ExportDefaultDeclarationKind::FunctionDeclaration(func) = &export.declaration {
+                if !self.has_jsdoc_before(export.span) {
+                    let name = func.id.as_ref()
+                        .map(|id| id.name.as_str())
+                        .unwrap_or("anonymous");
+                    self.linter.add_error(
+                        "export-requires-jsdoc".to_string(),
+                        format!("Exported function '{}' must have a JSDoc comment", name),
+                        export.span,
+                    );
                 }
-                _ => {}
             }
             
             oxc_ast::visit::walk::walk_export_default_declaration(self, export);
@@ -94,7 +90,7 @@ mod tests {
 
     fn parse_and_check(source: &str) -> Vec<String> {
         let allocator = Allocator::default();
-        let source_type = SourceType::default();
+        let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
         
         let mut linter = Linter::new(Path::new("test.ts"), source, false);

@@ -65,7 +65,7 @@ impl ExpectErrorDirectives {
         self.triggered_errors
             .borrow_mut()
             .entry(line)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(rule.to_string());
     }
     

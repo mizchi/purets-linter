@@ -1,5 +1,4 @@
 use oxc_ast::ast::*;
-use std::collections::HashSet;
 
 use crate::Linter;
 
@@ -331,7 +330,7 @@ mod tests {
 
     fn parse_and_check(source: &str) -> Vec<String> {
         let allocator = Allocator::default();
-        let source_type = SourceType::default();
+        let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
         
         let mut linter = Linter::new(Path::new("test.ts"), source, false);

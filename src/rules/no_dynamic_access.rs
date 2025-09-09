@@ -116,7 +116,7 @@ mod tests {
         let errors = parse_and_check(source);
         // Note: This will generate 2 errors - one for access, one for assignment
         // since ComputedMemberExpression triggers both checks
-        assert!(errors.len() >= 1);
+        assert!(!errors.is_empty());
         assert!(errors.iter().any(|e| e.contains("Dynamic property")));
     }
 

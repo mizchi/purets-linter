@@ -39,7 +39,7 @@ pub mod no_require;
 pub mod no_global_process;
 pub mod node_import_style;
 pub mod forbidden_libraries;
-pub mod filename_function_match;
+// Removed: filename_function_match - functionality moved to strict_named_export
 pub mod export_requires_jsdoc;
 pub mod no_side_effect_functions;
 pub mod allow_directives;
@@ -85,7 +85,7 @@ pub use no_require::check_no_require;
 pub use no_global_process::check_no_global_process;
 pub use node_import_style::check_node_import_style;
 pub use forbidden_libraries::check_forbidden_libraries;
-pub use filename_function_match::check_filename_function_match;
+// Removed: check_filename_function_match - functionality moved to check_strict_named_export
 pub use export_requires_jsdoc::check_export_requires_jsdoc;
 pub use no_side_effect_functions::check_no_side_effect_functions;
 pub use allow_directives::{check_allow_directives, AllowedFeatures, UsedFeatures};

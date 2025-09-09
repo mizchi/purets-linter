@@ -11,7 +11,7 @@ pub fn check_interface_extends_only(linter: &mut Linter, program: &Program) {
     impl<'a> Visit<'a> for InterfaceChecker<'a> {
         fn visit_ts_interface_declaration(&mut self, decl: &TSInterfaceDeclaration<'a>) {
             // Check if interface has extends clause
-            if decl.extends.is_none() || decl.extends.as_ref().map_or(true, |e| e.is_empty()) {
+            if decl.extends.is_none() || decl.extends.as_ref().is_none_or(|e| e.is_empty()) {
                 self.linter.add_error(
                     "interface-extends-only".to_string(),
                     format!(

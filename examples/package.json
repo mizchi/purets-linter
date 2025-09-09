@@ -1,0 +1,6 @@
+{
+  "name": "@internal/pure-ts-example",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

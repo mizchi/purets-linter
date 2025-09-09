@@ -57,7 +57,7 @@ impl<'a> CodeAnalyzer<'a> {
         
         // Parse AST for detailed metrics
         let allocator = Allocator::default();
-        let source_type = SourceType::from_path(path).unwrap_or(SourceType::default());
+        let source_type = SourceType::from_path(path).unwrap_or_default();
         let ret = Parser::new(&allocator, &source, source_type).parse();
         
         if ret.errors.is_empty() {

@@ -34,21 +34,10 @@ pub fn check_empty_array_requires_type(linter: &mut Linter, program: &Program) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
-    use std::path::Path;
+    use crate::test_utils::test::*;
 
-    fn parse_and_check(source: &str) -> Vec<String> {
-        let allocator = Allocator::default();
-        let source_type = SourceType::from_path("test.ts").unwrap();
-        let ret = Parser::new(&allocator, source, source_type).parse();
-        
-        let mut linter = Linter::new(Path::new("test.ts"), source, false);
-        check_empty_array_requires_type(&mut linter, &ret.program);
-        
-        linter.errors.into_iter().map(|e| e.rule).collect()
+    fn check(source: &str) -> Vec<String> {
+        check_rule(source, check_empty_array_requires_type)
     }
 
     #[test]
@@ -57,9 +46,9 @@ mod tests {
             const array = [];
         "#;
         
-        let errors = parse_and_check(source);
+        let errors = check(source);
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains(&"empty-array-requires-type".to_string()));
+        assert_errors_contain(&errors, &["Empty array 'array' requires type annotation"]);
     }
 
     #[test]
@@ -68,8 +57,8 @@ mod tests {
             const array: Array<number> = [];
         "#;
         
-        let errors = parse_and_check(source);
-        assert!(errors.is_empty());
+        let errors = check(source);
+        assert_no_errors(&errors);
     }
 
     #[test]
@@ -78,8 +67,8 @@ mod tests {
             const array: number[] = [];
         "#;
         
-        let errors = parse_and_check(source);
-        assert!(errors.is_empty());
+        let errors = check(source);
+        assert_no_errors(&errors);
     }
 
     #[test]
@@ -88,8 +77,8 @@ mod tests {
             const array = [1, 2, 3];
         "#;
         
-        let errors = parse_and_check(source);
-        assert!(errors.is_empty());
+        let errors = check(source);
+        assert_no_errors(&errors);
     }
 
     #[test]
@@ -98,9 +87,9 @@ mod tests {
             let array = [];
         "#;
         
-        let errors = parse_and_check(source);
+        let errors = check(source);
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains(&"empty-array-requires-type".to_string()));
+        assert_errors_contain(&errors, &["Empty array 'array' requires type annotation"]);
     }
 
     #[test]
@@ -109,7 +98,7 @@ mod tests {
             const array = [] as const;
         "#;
         
-        let errors = parse_and_check(source);
-        assert_eq!(errors.len(), 0); // TODO: const assertion handling needs review
+        let errors = check(source);
+        assert_no_errors(&errors); // TODO: const assertion handling needs review
     }
 }
