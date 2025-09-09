@@ -5,8 +5,12 @@ use glob::glob;
 use oxc_allocator::Allocator;
 use oxc_parser::{Parser as OxcParser, ParserReturn};
 use oxc_span::SourceType;
+use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 
 use pure_ts::{Linter, TsConfigValidator, PackageJsonValidator, comparer};
 
@@ -24,6 +28,9 @@ struct Args {
     
     #[arg(long, help = "Validate tsconfig.json")]
     validate_tsconfig: bool,
+    
+    #[arg(short = 'j', long = "jobs", help = "Number of parallel jobs (default: CPU count)")]
+    jobs: Option<usize>,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -84,32 +91,65 @@ fn main() -> Result<()> {
     }
     
     let files = collect_files(&path)?;
-    let mut has_errors = false;
-    let mut total_errors = 0;
+    let file_count = files.len();
     
-    for file_path in files {
-        match check_file(&file_path, args.verbose) {
-            Ok(error_count) => {
-                if error_count > 0 {
-                    has_errors = true;
-                    total_errors += error_count;
-                }
-            }
-            Err(e) => {
-                eprintln!("{}: {}", "Error".red().bold(), e);
-                has_errors = true;
-            }
-        }
+    if file_count == 0 {
+        println!("No TypeScript files found");
+        return Ok(());
     }
     
+    // Configure thread pool if specified
+    if let Some(jobs) = args.jobs {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(jobs)
+            .build_global()
+            .unwrap_or_else(|e| eprintln!("Warning: Failed to set thread count: {}", e));
+    }
+    
+    let start = Instant::now();
+    let total_errors = Arc::new(AtomicUsize::new(0));
+    let verbose = args.verbose;
+    
+    // Process files in parallel using rayon
+    let _results: Vec<_> = files
+        .par_iter()
+        .map(|file_path| {
+            match check_file(file_path, verbose) {
+                Ok(error_count) => {
+                    if error_count > 0 {
+                        total_errors.fetch_add(error_count, Ordering::Relaxed);
+                    }
+                    Ok(error_count)
+                }
+                Err(e) => {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
+                    total_errors.fetch_add(1, Ordering::Relaxed);
+                    Err(e)
+                }
+            }
+        })
+        .collect();
+    
+    let duration = start.elapsed();
+    let total_errors = total_errors.load(Ordering::Relaxed);
+    let has_errors = total_errors > 0;
+    
     if has_errors {
-        eprintln!("\n{} {} found", 
+        eprintln!("\n{} {} found in {:.2}s", 
             "✗".red().bold(),
-            format!("{} error{}", total_errors, if total_errors != 1 { "s" } else { "" }).red().bold()
+            format!("{} error{}", total_errors, if total_errors != 1 { "s" } else { "" }).red().bold(),
+            duration.as_secs_f64()
         );
         std::process::exit(1);
     } else {
-        println!("{} {}", "✓".green().bold(), "No errors found".green());
+        println!("{} {} in {} file{} ({:.2}s, {:.0} files/sec)", 
+            "✓".green().bold(), 
+            "No errors found".green(),
+            file_count,
+            if file_count != 1 { "s" } else { "" },
+            duration.as_secs_f64(),
+            file_count as f64 / duration.as_secs_f64()
+        );
     }
     
     Ok(())

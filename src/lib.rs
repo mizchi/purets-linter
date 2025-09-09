@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 pub mod rules;
 pub mod comparer;
+pub mod combined_visitor;
 mod tsconfig_validator;
 mod package_json_validator;
 
@@ -36,39 +37,9 @@ impl Linter {
     }
     
     pub fn check_program(&mut self, program: &oxc_ast::ast::Program) {
-        use crate::rules::*;
-        
-        check_no_classes(self, program);
-        check_no_enums(self, program);
-        check_no_reexports(self, program);
-        check_no_namespace_imports(self, program);
-        check_no_member_assignments(self, program);
-        check_one_public_function(self, program);
-        check_no_top_level_side_effects(self, program);
-        check_no_unused_variables(self, program);
-        check_import_extensions(self, program);
-        check_no_getters_setters(self, program);
-        check_must_use_return_value(self, program);
-        check_no_delete(self, program);
-        check_no_this_in_functions(self, program);
-        check_no_throw(self, program);
-        check_no_foreach(self, program);
-        check_no_filename_dirname(self, program);
-        check_interface_extends_only(self, program);
-        check_no_eval_function(self, program);
-        check_no_object_assign(self, program);
-        check_no_constant_condition(self, program);
-        check_switch_case_block(self, program);
-        check_no_as_upcast(self, program);
-        check_let_requires_type(self, program);
-        check_catch_error_handling(self, program);
-        check_jsdoc_param_match(self, program);
-        check_no_named_exports(self, program);
-        check_export_const_type_required(self, program);
-        check_no_unused_map(self, program);
-        check_no_do_while(self, program);
-        check_no_mutable_record(self, program);
-        check_empty_array_requires_type(self, program);
+        // Use combined visitor for better performance
+        use crate::combined_visitor::check_program_combined;
+        check_program_combined(self, program);
     }
     
     pub fn add_error(&mut self, rule: String, message: String, span: Span) {

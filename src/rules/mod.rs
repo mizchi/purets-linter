@@ -30,6 +30,8 @@ pub mod no_unused_map;
 pub mod no_do_while;
 pub mod no_mutable_record;
 pub mod empty_array_requires_type;
+pub mod no_http_imports;
+pub mod prefer_readonly_array;
 
 pub use no_classes::check_no_classes;
 pub use no_enums::check_no_enums;
@@ -62,3 +64,5 @@ pub use no_unused_map::check_no_unused_map;
 pub use no_do_while::check_no_do_while;
 pub use no_mutable_record::check_no_mutable_record;
 pub use empty_array_requires_type::check_empty_array_requires_type;
+pub use no_http_imports::check_no_http_imports;
+pub use prefer_readonly_array::check_prefer_readonly_array;

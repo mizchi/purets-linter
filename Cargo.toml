@@ -24,6 +24,12 @@ glob = "0.3"
 colored = "2.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+rayon = "1.10"
 
 [dev-dependencies]
 tempfile = "3.8"
+criterion = "0.5"
+
+[[bench]]
+name = "linter_bench"
+harness = false
