@@ -9,12 +9,19 @@ use crate::Linter;
 /// - io/**/*.ts: Only async functions are allowed
 /// - pure/**/*.ts: Pure functions only, export function name must match filename
 /// - types/**/*.ts: Only one type export allowed, must match filename
+/// - *_test.ts: Must import function with same name (minus _test suffix)
 pub fn check_path_based_restrictions(
     linter: &mut Linter,
     program: &Program,
     file_path: &str,
 ) {
     let normalized_path = file_path.replace('\\', "/");
+    
+    // Check test files first (they can be in any directory)
+    if normalized_path.ends_with("_test.ts") {
+        check_test_file_imports(linter, program, &normalized_path);
+        return; // Test files don't need to follow other path restrictions
+    }
     
     // Check io/**/*.ts - only async functions allowed
     if normalized_path.contains("/io/") && normalized_path.ends_with(".ts") {
@@ -89,6 +96,20 @@ fn check_pure_functions(linter: &mut Linter, program: &Program, file_path: &str)
     
     let mut found_matching_export = false;
     let mut export_count = 0;
+    
+    // First, check that pure files don't import from io
+    for stmt in &program.body {
+        if let Statement::ImportDeclaration(import) = stmt {
+            let source = import.source.value.as_str();
+            if source.contains("/io/") {
+                linter.add_error(
+                    "path-based-restrictions".to_string(),
+                    "pure/**/*.ts files cannot import from io/**/*.ts (pure functions cannot depend on I/O)".to_string(),
+                    import.span,
+                );
+            }
+        }
+    }
     
     for stmt in &program.body {
         match stmt {
@@ -231,6 +252,75 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
     }
 }
 
+/// Check that *_test.ts files import the function with matching name
+fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &str) {
+    // Extract base filename without _test.ts suffix
+    let filename = file_path
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches("_test.ts");
+    
+    if filename.is_empty() {
+        return;
+    }
+    
+    let mut found_matching_import = false;
+    let mut has_imports = false;
+    
+    // Check import statements
+    for stmt in &program.body {
+        if let Statement::ImportDeclaration(import) = stmt {
+            has_imports = true;
+            
+            // Check if any specifier imports the expected function name
+            if let Some(specifiers) = &import.specifiers {
+                for specifier in specifiers {
+                    match specifier {
+                        ImportDeclarationSpecifier::ImportSpecifier(spec) => {
+                            let imported = spec.imported.name();
+                            if imported == filename {
+                                found_matching_import = true;
+                                break;
+                            }
+                        }
+                        ImportDeclarationSpecifier::ImportDefaultSpecifier(_) => {
+                            // For default imports, check if the source matches
+                            let source = import.source.value.as_str();
+                            if source.contains(filename) || source.ends_with(&format!("/{}.ts", filename)) {
+                                found_matching_import = true;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            
+            if found_matching_import {
+                break;
+            }
+        }
+    }
+    
+    // Report error if the matching import was not found
+    if has_imports && !found_matching_import {
+        linter.add_error(
+            "path-based-restrictions".to_string(),
+            format!("Test file '{}' must import function '{}' from the module being tested", 
+                    file_path.rsplit('/').next().unwrap_or(""), filename),
+            Span::new(0, 0),
+        );
+    } else if !has_imports {
+        linter.add_error(
+            "path-based-restrictions".to_string(),
+            format!("Test file '{}' must have at least one import statement", 
+                    file_path.rsplit('/').next().unwrap_or("")),
+            Span::new(0, 0),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,6 +388,18 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("must export a function named 'calculate'"));
 
+        // Pure function importing from io should error
+        let source = r#"
+            import { readFile } from "../io/file";
+            
+            export function calculate(a: number): number {
+                return a * 2;
+            }
+        "#;
+        let errors = parse_and_check(source, "src/pure/calculate.ts");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("cannot import from io"));
+
         // Correct pure function should pass
         let source = r#"
             export function calculate(a: number): number {
@@ -342,6 +444,55 @@ mod tests {
             export type Point = { x: number; y: number };
         "#;
         let errors = parse_and_check(source, "src/types/Point.ts");
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_test_file_imports() {
+        // Test file without matching import should error
+        let source = r#"
+            import { otherFunction } from "./other";
+            
+            describe("add", () => {
+                it("should work", () => {});
+            });
+        "#;
+        let errors = parse_and_check(source, "src/add_test.ts");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("must import function 'add'"));
+
+        // Test file with no imports should error
+        let source = r#"
+            describe("add", () => {
+                it("should work", () => {});
+            });
+        "#;
+        let errors = parse_and_check(source, "src/add_test.ts");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("must have at least one import"));
+
+        // Test file with matching import should pass
+        let source = r#"
+            import { add } from "./add";
+            
+            describe("add", () => {
+                it("should add two numbers", () => {
+                    expect(add(1, 2)).toBe(3);
+                });
+            });
+        "#;
+        let errors = parse_and_check(source, "src/add_test.ts");
+        assert_eq!(errors.len(), 0);
+
+        // Test file with default import matching should pass
+        let source = r#"
+            import calculate from "./calculate.ts";
+            
+            describe("calculate", () => {
+                it("should work", () => {});
+            });
+        "#;
+        let errors = parse_and_check(source, "src/calculate_test.ts");
         assert_eq!(errors.len(), 0);
     }
 }
