@@ -29,12 +29,18 @@ pub struct CombinedVisitor<'a> {
     // State for @allow directives
     allowed_features: AllowedFeatures,
     used_features: UsedFeatures,
+    // Special file types
+    is_error_file: bool,
 }
 
 impl<'a> CombinedVisitor<'a> {
     pub fn new(linter: &'a mut Linter) -> Self {
         // Parse @allow directives from the source
         let allowed_features = AllowedFeatures::from_jsdoc(&linter.source_text);
+        
+        // Check if this is an error file
+        let path_str = linter.path.to_str().unwrap_or("").replace('\\', "/");
+        let is_error_file = path_str.contains("/errors/");
         
         Self {
             linter,
@@ -52,6 +58,7 @@ impl<'a> CombinedVisitor<'a> {
             in_default_parameter: false,
             allowed_features,
             used_features: UsedFeatures::default(),
+            is_error_file,
         }
     }
     
@@ -145,8 +152,16 @@ impl<'a> CombinedVisitor<'a> {
         for item in &program.body {
             match item {
                 Statement::ExportNamedDeclaration(export) => {
-                    // Check for re-exports
-                    if export.source.is_some() && !export.specifiers.is_empty() {
+                    // Check for re-exports (skip for entry points/index files)
+                    let filename = self.linter.path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("");
+                    let is_entry_point = filename == "index" || 
+                                        self.linter.is_entry_point || 
+                                        self.linter.is_main_entry;
+                    
+                    if !is_entry_point && export.source.is_some() && !export.specifiers.is_empty() {
                         self.linter.add_error(
                             "no-reexports".to_string(),
                             format!("Re-exports from '{}' are not allowed", 
@@ -155,14 +170,7 @@ impl<'a> CombinedVisitor<'a> {
                         );
                     }
                     
-                    // Check for named exports
-                    if export.declaration.is_some() || !export.specifiers.is_empty() {
-                        self.linter.add_error(
-                            "no-named-exports".to_string(),
-                            "Named exports are not allowed. Use default export only".to_string(),
-                            export.span,
-                        );
-                    }
+                    // Named export checking is now handled by strict_named_export rule
                     
                     if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
                         if let Some(id) = &func.id {
@@ -201,11 +209,29 @@ impl<'a> CombinedVisitor<'a> {
                     }
                 }
                 Statement::ExportAllDeclaration(export) => {
-                    self.linter.add_error(
-                        "no-reexports".to_string(),
-                        format!("Re-exports from '{}' are not allowed", export.source.value),
-                        export.span,
-                    );
+                    // Check for re-exports (skip for entry points/index files)
+                    let filename = self.linter.path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("");
+                    let is_entry_point = filename == "index" || 
+                                        self.linter.is_entry_point || 
+                                        self.linter.is_main_entry;
+                    
+                    if !is_entry_point {
+                        self.linter.add_error(
+                            "no-reexports".to_string(),
+                            format!("Re-exports from '{}' are not allowed", export.source.value),
+                            export.span,
+                        );
+                    } else {
+                        // For entry points, namespace re-exports are still not allowed
+                        self.linter.add_error(
+                            "no-reexports".to_string(),
+                            format!("Namespace re-exports are not allowed in entry points. Use named exports: export {{ name }} from '{}'", export.source.value),
+                            export.span,
+                        );
+                    }
                 }
                 Statement::ExportDefaultDeclaration(export) => {
                     match &export.declaration {
@@ -273,74 +299,8 @@ impl<'a> CombinedVisitor<'a> {
         }
     }
     
-    fn check_filename_function_match(&mut self, program: &'a Program<'a>) {
-        let filename = self.linter.path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_string();
-        
-        if filename == "index" || filename.ends_with(".test") || filename.ends_with(".spec") {
-            return;
-        }
-        
-        let mut found_matching_export = false;
-        
-        for item in &program.body {
-            match item {
-                Statement::ExportDefaultDeclaration(export) => {
-                    match &export.declaration {
-                        ExportDefaultDeclarationKind::FunctionDeclaration(func) => {
-                            if let Some(id) = &func.id {
-                                if id.name.as_str() == filename {
-                                    found_matching_export = true;
-                                } else {
-                                    self.linter.add_error(
-                                        "filename-function-match".to_string(),
-                                        format!(
-                                            "Exported function name '{}' must match filename '{}'",
-                                            id.name, filename
-                                        ),
-                                        export.span,
-                                    );
-                                }
-                            }
-                        }
-                        ExportDefaultDeclarationKind::Identifier(ident) => {
-                            if ident.name.as_str() == filename {
-                                found_matching_export = true;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                Statement::ExportNamedDeclaration(export) => {
-                    if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
-                        if let Some(id) = &func.id {
-                            if id.name.as_str() == filename {
-                                found_matching_export = true;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        
-        if !found_matching_export && !filename.is_empty() {
-            let has_exports = program.body.iter().any(|stmt| {
-                matches!(stmt, Statement::ExportDefaultDeclaration(_) | 
-                              Statement::ExportNamedDeclaration(_))
-            });
-            
-            if has_exports {
-                self.linter.add_error(
-                    "filename-function-match".to_string(),
-                    format!("File '{}' must export a function with the same name", filename),
-                    oxc_span::Span::new(0, 0),
-                );
-            }
-        }
+    fn check_filename_function_match(&mut self, _program: &'a Program<'a>) {
+        // Filename-function match is now handled by the individual rule
     }
     
     fn check_export_jsdoc(&mut self, program: &'a Program<'a>) {
@@ -435,12 +395,8 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         self.in_default_parameter = false;
     }
     // Check for classes (no-classes rule)
+    // Classes are now checked by the individual no_classes rule which handles extends Error
     fn visit_class(&mut self, class: &Class<'a>) {
-        self.linter.add_error(
-            "no-classes".to_string(),
-            "Classes are not allowed in pure TypeScript subset".to_string(),
-            class.span,
-        );
         oxc_ast::visit::walk::walk_class(self, class);
     }
     
@@ -468,11 +424,16 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
     
     // Check for throw statements (no-throw rule)
     fn visit_throw_statement(&mut self, stmt: &ThrowStatement<'a>) {
-        self.linter.add_error(
-            "no-throw".to_string(),
-            "Throw statements are not allowed. Use Result type instead".to_string(),
-            stmt.span,
-        );
+        // Skip if @allow throws is specified
+        if !self.allowed_features.throws {
+            self.linter.add_error(
+                "no-throw".to_string(),
+                "Throw statements are not allowed. Use Result type instead".to_string(),
+                stmt.span,
+            );
+        } else {
+            self.used_features.throws = true;
+        }
         oxc_ast::visit::walk::walk_throw_statement(self, stmt);
     }
     
@@ -839,13 +800,14 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             );
         }
         
-        // Check import extensions
+        // Check import extensions - require .ts extension for TypeScript files
         if source.starts_with('.') || source.starts_with("../") {
-            if !source.ends_with(".js") && !source.ends_with(".mjs") 
-                && !source.ends_with(".cjs") && !source.ends_with(".json") {
+            if !source.ends_with(".ts") && !source.ends_with(".tsx") 
+                && !source.ends_with(".js") && !source.ends_with(".jsx") 
+                && !source.ends_with(".json") {
                 self.linter.add_error(
                     "import-extensions".to_string(),
-                    format!("Relative imports must have an extension. Change '{}' to '{}.js'", source, source),
+                    format!("Relative imports must have an extension. Change '{}' to '{}.ts'", source, source),
                     import.span,
                 );
             }
@@ -965,6 +927,12 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
     
     // Check for top-level side effects and unused map
     fn visit_expression_statement(&mut self, stmt: &ExpressionStatement<'a>) {
+        // Skip these checks for error files
+        if self.is_error_file {
+            oxc_ast::visit::walk::walk_expression_statement(self, stmt);
+            return;
+        }
+        
         // Only check at top level (simplified check)
         match &stmt.expression {
             Expression::CallExpression(call) => {
@@ -981,7 +949,16 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                     _ => false
                 };
                 
-                if !is_iife {
+                // Skip top-level side effects check for test files and main/entry files
+                let path_str = self.linter.path.to_str().unwrap_or("").replace('\\', "/");
+                let filename = self.linter.path.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("");
+                let is_test_file = path_str.contains("_test.ts") || path_str.contains(".test.ts");
+                let is_main_or_entry = filename == "main" || filename == "index" || 
+                                       self.linter.is_entry_point || self.linter.is_main_entry;
+                
+                if !is_iife && !is_test_file && !is_main_or_entry {
                     self.linter.add_error(
                         "no-top-level-side-effects".to_string(),
                         "Top-level function calls are not allowed (side effects)".to_string(),
@@ -1042,7 +1019,8 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
     }
     
     fn visit_this_expression(&mut self, expr: &ThisExpression) {
-        if self.in_function {
+        // Skip this check for error files (allows this.name in constructor)
+        if !self.is_error_file && self.in_function {
             self.linter.add_error(
                 "no-this-in-functions".to_string(),
                 "'this' is not allowed in regular functions".to_string(),
@@ -1102,12 +1080,15 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
     
     // Check for member assignments, dynamic assignments, and track array mutations
     fn visit_assignment_expression(&mut self, expr: &AssignmentExpression<'a>) {
-        if let AssignmentTarget::StaticMemberExpression(_) = &expr.left {
-            self.linter.add_error(
-                "no-member-assignments".to_string(),
-                "Direct member assignments are not allowed".to_string(),
-                expr.span,
-            );
+        // Skip member assignment check for error files (allows this.name = "...")
+        if !self.is_error_file {
+            if let AssignmentTarget::StaticMemberExpression(_) = &expr.left {
+                self.linter.add_error(
+                    "no-member-assignments".to_string(),
+                    "Direct member assignments are not allowed".to_string(),
+                    expr.span,
+                );
+            }
         }
         
         // Check for dynamic property assignment and track array mutations
@@ -1319,6 +1300,40 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
 
 /// Use the combined visitor for efficient linting
 pub fn check_program_combined(linter: &mut Linter, program: &Program) {
+    // Run combined visitor for most rules
     let mut visitor = CombinedVisitor::new(linter);
     visitor.check_program(program);
+    
+    // Run individual rules that need special handling
+    use crate::rules::{
+        check_strict_named_export,
+        check_filename_function_match,
+        check_no_top_level_side_effects,
+        check_path_based_restrictions,
+        check_no_classes,
+    };
+    
+    // Check if it's a test file or error class file
+    let path_str = linter.path.to_str().unwrap_or("").to_string();
+    let is_test_file = path_str.contains("_test.ts") || 
+                       path_str.contains(".test.ts") || 
+                       path_str.contains(".spec.ts");
+    let is_error_file = path_str.contains("/errors/");
+    
+    // Apply no-classes rule (must check for extends Error)
+    check_no_classes(linter, program);
+    
+    // Apply strict_named_export rule (replaces no-named-exports)
+    check_strict_named_export(linter, program);
+    
+    // Apply filename_function_match rule
+    check_filename_function_match(linter, program);
+    
+    // Apply no-top-level-side-effects rule only for non-test and non-error files
+    if !is_test_file && !is_error_file {
+        check_no_top_level_side_effects(linter, program);
+    }
+    
+    // Apply path-based restrictions
+    check_path_based_restrictions(linter, program, &path_str);
 }

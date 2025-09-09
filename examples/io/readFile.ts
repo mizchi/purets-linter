@@ -1,15 +1,5 @@
 import fs from "node:fs/promises";
-import { FileNotFoundError } from "./errors/FileNotFoundError.ts";
-
-/**
- * @allow throws
- * Reads a file from the filesystem.
- * This can be either sync or async in io/
- */
-export function readFileSync(path: string): string {
-  // Simulated sync read - throws custom error
-  throw new FileNotFoundError(path);
-}
+import { FileNotFoundError } from "../errors/FileNotFoundError.ts";
 
 /**
  * @allow throws

@@ -2,5 +2,10 @@
   "name": "pure-ts",
   "version": "0.1.0",
   "type": "module",
-  "dependencies": {}
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20250909.1",
+    "neverthrow": "^8.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
 }

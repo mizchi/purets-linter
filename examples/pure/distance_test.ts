@@ -1,39 +1,6 @@
+import { describe, it, expect } from "vitest";
 import { distance } from "./distance.ts";
 import type { Point } from "../types/Point.ts";
-
-/**
- * @allow console
- */
-function describe(name: string, fn: () => void): void {
-  console.log(`Testing: ${name}`);
-  fn();
-}
-
-/**
- * @allow console
- */
-function it(description: string, fn: () => void): void {
-  console.log(`  - ${description}`);
-  fn();
-}
-
-function expect<T>(actual: T) {
-  return {
-    toBe(expected: T): void {
-      if (actual !== expected) {
-        throw new Error(`Expected ${expected} but got ${actual}`);
-      }
-    },
-    toBeCloseTo(expected: number, precision: number = 2): void {
-      const actualNum = actual as unknown as number;
-      const multiplier = Math.pow(10, precision);
-      const diff = Math.round((actualNum - expected) * multiplier) / multiplier;
-      if (Math.abs(diff) > 0) {
-        throw new Error(`Expected ${expected} but got ${actualNum}`);
-      }
-    }
-  };
-}
 
 describe("distance", () => {
   it("should calculate distance between two points", () => {

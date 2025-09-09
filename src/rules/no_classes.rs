@@ -4,33 +4,41 @@ use oxc_ast::Visit;
 use crate::Linter;
 
 pub fn check_no_classes(linter: &mut Linter, program: &Program) {
-    // Allow classes in io/errors/*.ts for error definitions
-    let path_str = linter.path.to_str().unwrap_or("");
-    let normalized_path = path_str.replace('\\', "/");
-    
-    // Debug output
-    if linter.verbose {
-        eprintln!("DEBUG no-classes: Checking path: {}", normalized_path);
-    }
-    
-    if normalized_path.contains("/io/errors/") {
-        if linter.verbose {
-            eprintln!("DEBUG no-classes: Skipping class check for error definitions");
-        }
-        return; // Skip class checking for error definitions
-    }
-    
     struct ClassChecker<'a> {
         linter: &'a mut Linter,
     }
     
     impl<'a> Visit<'a> for ClassChecker<'a> {
         fn visit_class(&mut self, class: &Class<'a>) {
-            self.linter.add_error(
-                "no-classes".to_string(),
-                "Classes are not allowed in pure TypeScript subset".to_string(),
-                class.span,
-            );
+            // Check if class extends Error
+            let extends_error = if let Some(super_class) = &class.super_class {
+                // Debug: print the super class type
+                if self.linter.verbose {
+                    eprintln!("DEBUG: super_class type: {:?}", std::mem::discriminant(super_class));
+                }
+                
+                // Check if the super class is Error or ends with Error
+                match super_class {
+                    Expression::Identifier(ident) => {
+                        let name = ident.name.as_str();
+                        if self.linter.verbose {
+                            eprintln!("DEBUG: super class name: {}", name);
+                        }
+                        name == "Error"
+                    },
+                    _ => false
+                }
+            } else {
+                false
+            };
+            
+            if !extends_error {
+                self.linter.add_error(
+                    "no-classes".to_string(),
+                    "Classes are not allowed except when extending Error".to_string(),
+                    class.span,
+                );
+            }
         }
     }
     

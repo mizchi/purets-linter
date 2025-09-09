@@ -3,13 +3,16 @@
 use oxc_span::Span;
 use std::path::{Path, PathBuf};
 use crate::disable_directives::DisableDirectives;
+use crate::expect_error_directives::ExpectErrorDirectives;
 
 pub mod rules;
 pub mod comparer;
 pub mod combined_visitor;
 pub mod package_checker;
 pub mod disable_directives;
+pub mod expect_error_directives;
 pub mod test_runner;
+pub mod presets;
 mod tsconfig_validator;
 mod package_json_validator;
 
@@ -24,7 +27,10 @@ pub struct Linter {
     pub errors: Vec<LintError>,
     pub verbose: bool,
     disable_directives: DisableDirectives,
+    expect_error_directives: ExpectErrorDirectives,
     pub test_runner: Option<TestRunner>,
+    pub is_entry_point: bool,
+    pub is_main_entry: bool,
 }
 
 #[derive(Debug)]
@@ -37,6 +43,7 @@ pub struct LintError {
 impl Linter {
     pub fn new(path: &Path, source_text: &str, verbose: bool) -> Self {
         let disable_directives = DisableDirectives::from_source(source_text);
+        let expect_error_directives = ExpectErrorDirectives::from_source(source_text);
         
         Self {
             path: path.to_path_buf(),
@@ -44,12 +51,25 @@ impl Linter {
             errors: Vec::new(),
             verbose,
             disable_directives,
+            expect_error_directives,
             test_runner: None,
+            is_entry_point: false,
+            is_main_entry: false,
         }
     }
     
     pub fn with_test_runner(mut self, test_runner: Option<TestRunner>) -> Self {
         self.test_runner = test_runner;
+        self
+    }
+    
+    pub fn with_entry_point(mut self, is_entry: bool) -> Self {
+        self.is_entry_point = is_entry;
+        self
+    }
+    
+    pub fn with_main_entry(mut self, is_main: bool) -> Self {
+        self.is_main_entry = is_main;
         self
     }
     
@@ -68,11 +88,65 @@ impl Linter {
             return; // Skip this error
         }
         
+        // Check if this error is expected
+        if self.expect_error_directives.is_error_expected(line - 1, &rule) {
+            self.expect_error_directives.mark_as_triggered(line - 1, &rule);
+            return; // Skip this error as it was expected
+        }
+        
         self.errors.push(LintError {
             rule,
             message,
             span,
         });
+    }
+    
+    pub fn check_untriggered_expect_errors(&mut self) {
+        // After all checks, report any untriggered expect-error directives
+        let untriggered = self.expect_error_directives.get_untriggered_errors();
+        
+        for (line, rules) in untriggered {
+            // Convert line number (0-based) to 1-based for display
+            let display_line = line + 1;
+            
+            // Calculate span for the expect-error line
+            let mut current_line = 0;
+            let mut char_pos = 0;
+            
+            for ch in self.source_text.chars() {
+                if current_line == line {
+                    // Found the line, create a span for it
+                    let span_start = char_pos;
+                    // Find end of line
+                    let mut span_end = char_pos;
+                    for ch2 in self.source_text[char_pos..].chars() {
+                        if ch2 == '\n' {
+                            break;
+                        }
+                        span_end += ch2.len_utf8();
+                    }
+                    
+                    let span = Span::new(span_start as u32, span_end as u32);
+                    
+                    for rule in rules {
+                        self.errors.push(LintError {
+                            rule: "unused-expect-error".to_string(),
+                            message: format!(
+                                "Expected error '{}' on line {} was not triggered",
+                                rule, display_line
+                            ),
+                            span,
+                        });
+                    }
+                    break;
+                }
+                
+                if ch == '\n' {
+                    current_line += 1;
+                }
+                char_pos += ch.len_utf8();
+            }
+        }
     }
     
     pub fn has_errors(&self) -> bool {

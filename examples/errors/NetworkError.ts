@@ -4,9 +4,9 @@
 export class NetworkError extends Error {
   constructor(
     public readonly url: string,
-    public readonly statusCode?: number
+    public readonly statusCode: number
   ) {
-    super(`Network request failed: ${url}${statusCode ? ` (${statusCode})` : ""}`);
+    super(`Network request failed: ${url} (${statusCode})`);
     this.name = "NetworkError";
   }
 }

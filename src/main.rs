@@ -34,6 +34,12 @@ struct Args {
     
     #[arg(long = "test", help = "Test runner to use (vitest, node-test, deno-test)")]
     test: Option<String>,
+    
+    #[arg(long = "entry", help = "Mark files as entry points (allows re-exports)", value_delimiter = ',')]
+    entry: Vec<String>,
+    
+    #[arg(long = "main", help = "Mark files as main entry points", value_delimiter = ',')]
+    main: Vec<String>,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -144,12 +150,37 @@ fn main() -> Result<()> {
     let total_errors = Arc::new(AtomicUsize::new(0));
     let verbose = args.verbose;
     
+    // Convert entry and main paths to absolute paths for comparison
+    let entry_paths: Vec<PathBuf> = args.entry.iter()
+        .map(|p| Path::new(p).canonicalize().unwrap_or_else(|_| PathBuf::from(p)))
+        .collect();
+    let main_paths: Vec<PathBuf> = args.main.iter()
+        .map(|p| Path::new(p).canonicalize().unwrap_or_else(|_| PathBuf::from(p)))
+        .collect();
+    
     // Process files in parallel using rayon
     let _results: Vec<_> = files
         .par_iter()
         .map(|file_path| {
             let runner = test_runner.clone();
-            match check_file_with_test_runner(file_path, verbose, runner) {
+            // Compare canonical paths or check if the file path ends with the entry/main path
+            let is_entry = entry_paths.iter().any(|ep| {
+                let matches = file_path == ep || 
+                    ep.file_name().map_or(false, |name| file_path.ends_with(name));
+                if verbose && matches {
+                    eprintln!("DEBUG: Marking {} as entry point", file_path.display());
+                }
+                matches
+            });
+            let is_main = main_paths.iter().any(|mp| {
+                let matches = file_path == mp || 
+                    mp.file_name().map_or(false, |name| file_path.ends_with(name));
+                if verbose && matches {
+                    eprintln!("DEBUG: Marking {} as main entry", file_path.display());
+                }
+                matches
+            });
+            match check_file_with_options(file_path, verbose, runner, is_entry, is_main) {
                 Ok(error_count) => {
                     if error_count > 0 {
                         total_errors.fetch_add(error_count, Ordering::Relaxed);
@@ -221,10 +252,20 @@ fn collect_files(path: &str) -> Result<Vec<PathBuf>> {
 }
 
 fn check_file(path: &Path, verbose: bool) -> Result<usize> {
-    check_file_with_test_runner(path, verbose, None)
+    check_file_with_options(path, verbose, None, false, false)
 }
 
 fn check_file_with_test_runner(path: &Path, verbose: bool, test_runner: Option<TestRunner>) -> Result<usize> {
+    check_file_with_options(path, verbose, test_runner, false, false)
+}
+
+fn check_file_with_options(
+    path: &Path,
+    verbose: bool,
+    test_runner: Option<TestRunner>,
+    is_entry: bool,
+    is_main: bool,
+) -> Result<usize> {
     let source_text = fs::read_to_string(path)?;
     let allocator = Allocator::default();
     let source_type = SourceType::from_path(path).unwrap_or(SourceType::default());
@@ -247,8 +288,13 @@ fn check_file_with_test_runner(path: &Path, verbose: bool, test_runner: Option<T
     }
     
     let mut linter = Linter::new(path, &source_text, verbose)
-        .with_test_runner(test_runner);
+        .with_test_runner(test_runner)
+        .with_entry_point(is_entry)
+        .with_main_entry(is_main);
     linter.check_program(&program);
+    
+    // Check for untriggered expect-error directives
+    linter.check_untriggered_expect_errors();
     
     if linter.has_errors() {
         let error_count = linter.errors.len();

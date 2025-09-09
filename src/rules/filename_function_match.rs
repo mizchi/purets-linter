@@ -6,20 +6,40 @@ use crate::Linter;
 pub fn check_filename_function_match(linter: &mut Linter, program: &Program) {
     use oxc_ast::Visit;
     
+    // Skip type definition files in types/ directory and error classes first
+    let path_str = linter.path.to_str().unwrap_or("").replace('\\', "/");
+    if linter.verbose {
+        eprintln!("DEBUG filename-function-match: path_str = {}", path_str);
+    }
+    if path_str.contains("/types/") || path_str.contains("/errors/") {
+        if linter.verbose {
+            eprintln!("DEBUG filename-function-match: Skipping types/errors file");
+        }
+        return;
+    }
+    
     // Get filename without extension
     let filename = linter.path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("");
     
+    // Remove leading underscore for private files
+    let expected_name = if filename.starts_with('_') {
+        &filename[1..]
+    } else {
+        filename
+    };
+    
     // Skip index files and test files
-    if filename == "index" || filename.ends_with(".test") || filename.ends_with(".spec") {
+    if filename == "index" || filename.ends_with(".test") || filename.ends_with(".spec") || filename.ends_with("_test") {
         return;
     }
     
     struct FilenameMatchVisitor<'a, 'b> {
         linter: &'a mut Linter,
         filename: String,
+        expected_name: String,
         found_matching_export: bool,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
@@ -30,14 +50,14 @@ pub fn check_filename_function_match(linter: &mut Linter, program: &Program) {
             match &export.declaration {
                 ExportDefaultDeclarationKind::FunctionDeclaration(func) => {
                     if let Some(id) = &func.id {
-                        if id.name.as_str() == self.filename {
+                        if id.name.as_str() == self.expected_name {
                             self.found_matching_export = true;
                         } else {
                             self.linter.add_error(
                                 "filename-function-match".to_string(),
                                 format!(
                                     "Exported function name '{}' must match filename '{}'",
-                                    id.name, self.filename
+                                    id.name, self.expected_name
                                 ),
                                 export.span,
                             );
@@ -45,12 +65,12 @@ pub fn check_filename_function_match(linter: &mut Linter, program: &Program) {
                     }
                 }
                 ExportDefaultDeclarationKind::Identifier(ident) => {
-                    if ident.name.as_str() != self.filename {
+                    if ident.name.as_str() != self.expected_name {
                         self.linter.add_error(
                             "filename-function-match".to_string(),
                             format!(
                                 "Exported identifier '{}' must match filename '{}'",
-                                ident.name, self.filename
+                                ident.name, self.expected_name
                             ),
                             export.span,
                         );
@@ -68,7 +88,7 @@ pub fn check_filename_function_match(linter: &mut Linter, program: &Program) {
             // Check named export functions
             if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
                 if let Some(id) = &func.id {
-                    if id.name.as_str() == self.filename {
+                    if id.name.as_str() == self.expected_name {
                         self.found_matching_export = true;
                     }
                 }
@@ -82,10 +102,12 @@ pub fn check_filename_function_match(linter: &mut Linter, program: &Program) {
     }
     
     let filename_str = filename.to_string();
+    let expected_name_str = expected_name.to_string();
     
     let mut visitor = FilenameMatchVisitor {
         linter,
         filename: filename_str.clone(),
+        expected_name: expected_name_str.clone(),
         found_matching_export: false,
         _phantom: std::marker::PhantomData,
     };
@@ -103,7 +125,7 @@ pub fn check_filename_function_match(linter: &mut Linter, program: &Program) {
         if has_exports {
             visitor.linter.add_error(
                 "filename-function-match".to_string(),
-                format!("File '{}' must export a function with the same name", filename_str),
+                format!("File '{}' must export a function with the same name '{}'", filename_str, expected_name_str),
                 oxc_span::Span::new(0, 0),
             );
         }
