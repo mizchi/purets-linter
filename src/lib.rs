@@ -4,6 +4,7 @@ use oxc_span::Span;
 use std::path::{Path, PathBuf};
 
 pub mod rules;
+pub mod comparer;
 mod tsconfig_validator;
 mod package_json_validator;
 

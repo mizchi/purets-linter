@@ -8,13 +8,16 @@ use oxc_span::SourceType;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use pure_ts::{Linter, TsConfigValidator, PackageJsonValidator};
+use pure_ts::{Linter, TsConfigValidator, PackageJsonValidator, comparer};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
+    
     #[arg(help = "TypeScript file or directory to check")]
-    path: String,
+    path: Option<String>,
     
     #[arg(short, long, help = "Show detailed error messages")]
     verbose: bool,
@@ -23,16 +26,54 @@ struct Args {
     validate_tsconfig: bool,
 }
 
+#[derive(clap::Subcommand, Debug)]
+enum Command {
+    /// Compare code metrics between two files or directories
+    Compare {
+        /// Path to the original file or directory
+        before: String,
+        /// Path to the refactored file or directory
+        after: String,
+    },
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
     
+    // Handle compare command
+    if let Some(Command::Compare { before, after }) = args.command {
+        let before_path = Path::new(&before);
+        let after_path = Path::new(&after);
+        
+        if before_path.is_file() && after_path.is_file() {
+            let comparison = comparer::compare_files(before_path, after_path)?;
+            println!("{}", comparison);
+        } else if before_path.is_dir() && after_path.is_dir() {
+            let comparisons = comparer::compare_directories(before_path, after_path)?;
+            for comparison in &comparisons {
+                println!("{}", comparison);
+            }
+            comparer::print_summary(&comparisons);
+        } else {
+            eprintln!("Error: Both paths must be either files or directories");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+    
+    // Regular linting mode
+    let path = args.path.unwrap_or_else(|| {
+        eprintln!("Error: Path is required when not using compare mode");
+        std::process::exit(1);
+    });
+    
     // Validate tsconfig.json if requested
     if args.validate_tsconfig {
-        let mut tsconfig_validator = TsConfigValidator::new(args.path.clone());
+        let mut tsconfig_validator = TsConfigValidator::new(path.clone());
         tsconfig_validator.validate()?;
         tsconfig_validator.report();
         
-        let mut package_validator = PackageJsonValidator::new(args.path.clone());
+        let mut package_validator = PackageJsonValidator::new(path.clone());
         package_validator.validate()?;
         package_validator.report();
         
@@ -42,7 +83,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
     
-    let files = collect_files(&args.path)?;
+    let files = collect_files(&path)?;
     let mut has_errors = false;
     let mut total_errors = 0;
     
