@@ -257,9 +257,9 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         oxc_ast::visit::walk::walk_throw_statement(self, stmt);
     }
     
-    // Check for forEach (no-foreach rule), eval, must-use-return-value, and track array mutations
+    // Check for forEach, eval, Object.defineProperty, and track array mutations
     fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
-        // Check for forEach and track array mutations
+        // Check for forEach, Object.defineProperty, and track array mutations
         if let Some(member) = call.callee.as_member_expression() {
             if let MemberExpression::StaticMemberExpression(static_member) = &member {
                 let method_name = static_member.property.name.as_str();
@@ -272,9 +272,26 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                     );
                 }
                 
-                // Track mutating array methods
-                if let Expression::Identifier(obj_id) = &static_member.object {
-                    let obj_name = obj_id.name.to_string();
+                // Check for Object.defineProperty and Object.defineProperties
+                if let Expression::Identifier(obj) = &static_member.object {
+                    if obj.name == "Object" {
+                        if method_name == "defineProperty" {
+                            self.linter.add_error(
+                                "no-define-property".to_string(),
+                                "Object.defineProperty is not allowed. Use direct property assignment or object literals instead".to_string(),
+                                call.span,
+                            );
+                        } else if method_name == "defineProperties" {
+                            self.linter.add_error(
+                                "no-define-property".to_string(),
+                                "Object.defineProperties is not allowed. Use direct property assignment or object literals instead".to_string(),
+                                call.span,
+                            );
+                        }
+                    }
+                    
+                    // Track mutating array methods
+                    let obj_name = obj.name.to_string();
                     if self.array_variables.contains_key(&obj_name) {
                         const MUTATING_METHODS: &[&str] = &[
                             "push", "pop", "shift", "unshift", "splice", 
@@ -509,8 +526,27 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         oxc_ast::visit::walk::walk_expression_statement(self, stmt);
     }
     
-    // Check for this in functions (no-this-in-functions rule)
+    // Check for this in functions and max params
     fn visit_function(&mut self, func: &Function<'a>, _flags: ScopeFlags) {
+        // Check max function params (max-function-params rule)
+        const MAX_PARAMS: usize = 2;
+        let param_count = func.params.items.len();
+        if param_count > MAX_PARAMS {
+            let func_name = func.id.as_ref()
+                .map(|id| id.name.as_str())
+                .unwrap_or("<anonymous>");
+            
+            self.linter.add_error(
+                "max-function-params".to_string(),
+                format!(
+                    "Function '{}' has {} parameters (max: {}). Use an options object as the second parameter instead",
+                    func_name, param_count, MAX_PARAMS
+                ),
+                func.span,
+            );
+        }
+        
+        // Track function context for no-this-in-functions
         let was_in_function = self.in_function;
         self.in_function = true;
         oxc_ast::visit::walk::walk_function(self, func, _flags);
@@ -540,8 +576,9 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         oxc_ast::visit::walk::walk_meta_property(self, meta);
     }
     
-    // Check for Object.assign (no-object-assign rule) and member assignments
+    // Check for Object.assign, dynamic access, and member assignments
     fn visit_member_expression(&mut self, expr: &MemberExpression<'a>) {
+        // Check for Object.assign
         if let MemberExpression::StaticMemberExpression(static_member) = expr {
             if let Expression::Identifier(obj) = &static_member.object {
                 if obj.name == "Object" && static_member.property.name == "assign" {
@@ -553,10 +590,29 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 }
             }
         }
+        
+        // Check for dynamic property access (no-dynamic-access rule)
+        if let MemberExpression::ComputedMemberExpression(computed) = expr {
+            // Allow numeric indices for arrays
+            let is_numeric = match &computed.expression {
+                Expression::NumericLiteral(_) => true,
+                Expression::StringLiteral(lit) => lit.value.parse::<i32>().is_ok(),
+                _ => false,
+            };
+            
+            if !is_numeric {
+                self.linter.add_error(
+                    "no-dynamic-access".to_string(),
+                    "Dynamic property access is not allowed. Use dot notation or destructuring instead".to_string(),
+                    computed.span,
+                );
+            }
+        }
+        
         oxc_ast::visit::walk::walk_member_expression(self, expr);
     }
     
-    // Check for member assignments (no-member-assignments rule) and track array mutations
+    // Check for member assignments, dynamic assignments, and track array mutations
     fn visit_assignment_expression(&mut self, expr: &AssignmentExpression<'a>) {
         if let AssignmentTarget::StaticMemberExpression(_) = &expr.left {
             self.linter.add_error(
@@ -566,8 +622,24 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             );
         }
         
-        // Track array element assignments like arr[0] = value
+        // Check for dynamic property assignment and track array mutations
         if let AssignmentTarget::ComputedMemberExpression(member) = &expr.left {
+            // Check if it's numeric (for arrays)
+            let is_numeric = match &member.expression {
+                Expression::NumericLiteral(_) => true,
+                Expression::StringLiteral(lit) => lit.value.parse::<i32>().is_ok(),
+                _ => false,
+            };
+            
+            if !is_numeric {
+                self.linter.add_error(
+                    "no-dynamic-access".to_string(),
+                    "Dynamic property assignment is not allowed. Use dot notation instead".to_string(),
+                    member.span,
+                );
+            }
+            
+            // Track array element assignments
             if let Expression::Identifier(id) = &member.object {
                 let name = id.name.to_string();
                 if self.array_variables.contains_key(&name) {
@@ -679,6 +751,24 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         oxc_ast::visit::walk::walk_ts_type_reference(self, type_ref);
+    }
+    
+    // Check arrow functions for max params
+    fn visit_arrow_function_expression(&mut self, arrow: &ArrowFunctionExpression<'a>) {
+        const MAX_PARAMS: usize = 2;
+        let param_count = arrow.params.items.len();
+        if param_count > MAX_PARAMS {
+            self.linter.add_error(
+                "max-function-params".to_string(),
+                format!(
+                    "Arrow function has {} parameters (max: {}). Use an options object as the second parameter instead",
+                    param_count, MAX_PARAMS
+                ),
+                arrow.span,
+            );
+        }
+        
+        oxc_ast::visit::walk::walk_arrow_function_expression(self, arrow);
     }
 }
 
