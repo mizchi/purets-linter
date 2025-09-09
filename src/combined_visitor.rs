@@ -4,7 +4,7 @@ use oxc_span::GetSpan;
 use oxc_syntax::scope::ScopeFlags;
 use std::collections::{HashMap, HashSet};
 
-use crate::Linter;
+use crate::{Linter, rules::AllowedFeatures};
 
 /// Combined visitor that performs all rule checks in a single AST traversal
 pub struct CombinedVisitor<'a> {
@@ -26,10 +26,15 @@ pub struct CombinedVisitor<'a> {
     imported_process_names: HashSet<String>,
     // State for no-side-effect-functions
     in_default_parameter: bool,
+    // State for @allow directives
+    allowed_features: AllowedFeatures,
 }
 
 impl<'a> CombinedVisitor<'a> {
     pub fn new(linter: &'a mut Linter) -> Self {
+        // Parse @allow directives from the source
+        let allowed_features = AllowedFeatures::from_jsdoc(&linter.source_text);
+        
         Self {
             linter,
             exported_functions: Vec::new(),
@@ -44,6 +49,7 @@ impl<'a> CombinedVisitor<'a> {
             readonly_arrays: HashSet::new(),
             imported_process_names: HashSet::new(),
             in_default_parameter: false,
+            allowed_features,
         }
     }
     
@@ -470,21 +476,30 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                         }
                     }
                     
-                    // Check for side-effect functions (Math.random, Date.now)
-                    if self.in_function && !self.in_default_parameter {
+                    // Check for side-effect functions (Math.random, Date.now) - skip if mutations allowed
+                    if self.in_function && !self.in_default_parameter && !self.allowed_features.mutations {
                         if (obj.name == "Math" && method_name == "random") {
                             self.linter.add_error(
                                 "no-side-effect-functions".to_string(),
-                                "Direct use of 'Math.random()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
+                                "Direct use of 'Math.random()' is not allowed in functions. Pass it as a parameter, use a default parameter, or add '@allow mutations' directive".to_string(),
                                 call.span,
                             );
                         } else if (obj.name == "Date" && method_name == "now") {
                             self.linter.add_error(
                                 "no-side-effect-functions".to_string(),
-                                "Direct use of 'Date.now()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
+                                "Direct use of 'Date.now()' is not allowed in functions. Pass it as a parameter, use a default parameter, or add '@allow mutations' directive".to_string(),
                                 call.span,
                             );
                         }
+                    }
+                    
+                    // Check console access
+                    if obj.name == "console" && !self.allowed_features.console {
+                        self.linter.add_error(
+                            "allow-directives".to_string(),
+                            "Use of 'console' requires '@allow console' directive".to_string(),
+                            call.span,
+                        );
                     }
                 }
             }
@@ -540,21 +555,30 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 }
             } else if self.in_function && !self.in_default_parameter {
                 // Check for global side-effect functions (setTimeout, setInterval, etc.)
-                const SIDE_EFFECT_GLOBAL_FUNCTIONS: &[&str] = &[
+                const TIMER_FUNCTIONS: &[&str] = &[
                     "setTimeout", "setInterval", "setImmediate",
                     "requestAnimationFrame", "requestIdleCallback",
                 ];
                 
-                if SIDE_EFFECT_GLOBAL_FUNCTIONS.contains(&ident.name.as_str()) {
+                if TIMER_FUNCTIONS.contains(&ident.name.as_str()) && !self.allowed_features.timers {
                     self.linter.add_error(
-                        "no-side-effect-functions".to_string(),
+                        "allow-directives".to_string(),
                         format!(
-                            "Direct use of '{}()' is not allowed in functions. Pass it as a parameter or use a default parameter instead",
+                            "Use of '{}' requires '@allow timers' directive",
                             ident.name
                         ),
                         call.span,
                     );
                 }
+            }
+            
+            // Check fetch access
+            if ident.name == "fetch" && !self.allowed_features.net {
+                self.linter.add_error(
+                    "allow-directives".to_string(),
+                    "Use of 'fetch' requires '@allow net' directive".to_string(),
+                    call.span,
+                );
             }
         }
         
@@ -563,17 +587,30 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
     
     // Check for new Date() side effect
     fn visit_new_expression(&mut self, new_expr: &NewExpression<'a>) {
-        if self.in_function && !self.in_default_parameter {
+        if self.in_function && !self.in_default_parameter && !self.allowed_features.mutations {
             if let Expression::Identifier(ident) = &new_expr.callee {
                 if ident.name == "Date" {
                     self.linter.add_error(
                         "no-side-effect-functions".to_string(),
-                        "Direct use of 'new Date()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
+                        "Direct use of 'new Date()' is not allowed in functions. Pass it as a parameter, use a default parameter, or add '@allow mutations' directive".to_string(),
                         new_expr.span,
                     );
                 }
             }
         }
+        
+        // Check WebSocket, XMLHttpRequest
+        if let Expression::Identifier(ident) = &new_expr.callee {
+            if (ident.name == "WebSocket" || ident.name == "XMLHttpRequest" || ident.name == "EventSource") 
+                && !self.allowed_features.net {
+                self.linter.add_error(
+                    "allow-directives".to_string(),
+                    format!("Use of '{}' requires '@allow net' directive", ident.name),
+                    new_expr.span,
+                );
+            }
+        }
+        
         oxc_ast::visit::walk::walk_new_expression(self, new_expr);
     }
     
@@ -819,18 +856,50 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         oxc_ast::visit::walk::walk_variable_declarator(self, decl);
     }
     
-    // Track variable usage and check for global process
+    // Track variable usage and check for global process/DOM access
     fn visit_identifier_reference(&mut self, ident: &IdentifierReference<'a>) {
         let name = ident.name.to_string();
         self.used_vars.insert(name.clone());
         
         // Check for global process usage (no-global-process rule)
         if ident.name == "process" && !self.imported_process_names.contains(&name) {
-            self.linter.add_error(
-                "no-global-process".to_string(),
-                "Global 'process' is not allowed. Import it from 'node:process' instead".to_string(),
-                ident.span,
-            );
+            // Check if @allow process is present
+            if !self.allowed_features.process {
+                self.linter.add_error(
+                    "no-global-process".to_string(),
+                    "Global 'process' is not allowed. Import it from 'node:process' or add '@allow process' directive".to_string(),
+                    ident.span,
+                );
+            }
+        }
+        
+        // Check DOM globals
+        if !self.allowed_features.dom {
+            const DOM_GLOBALS: &[&str] = &[
+                "document", "window", "navigator", "location", 
+                "localStorage", "sessionStorage", "history",
+                "screen", "alert", "confirm", "prompt"
+            ];
+            
+            if DOM_GLOBALS.contains(&ident.name.as_str()) {
+                self.linter.add_error(
+                    "allow-directives".to_string(),
+                    format!("Access to '{}' requires '@allow dom' directive", ident.name),
+                    ident.span,
+                );
+            }
+        }
+        
+        // Check network globals
+        if !self.allowed_features.net {
+            if ident.name == "XMLHttpRequest" || ident.name == "WebSocket" || 
+               ident.name == "EventSource" || ident.name == "ServiceWorker" {
+                self.linter.add_error(
+                    "allow-directives".to_string(),
+                    format!("Access to '{}' requires '@allow net' directive", ident.name),
+                    ident.span,
+                );
+            }
         }
         
         oxc_ast::visit::walk::walk_identifier_reference(self, ident);
@@ -1115,15 +1184,53 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         self.current_catch_param = None;
     }
     
-    // Check for mutable Record (no-mutable-record rule)
+    // Check for mutable Record and DOM/Net types
     fn visit_ts_type_reference(&mut self, type_ref: &TSTypeReference<'a>) {
         if let TSTypeName::IdentifierReference(id) = &type_ref.type_name {
-            if id.name == "Record" {
+            let name = id.name.as_str();
+            
+            // Check mutable Record
+            if name == "Record" {
                 self.linter.add_error(
                     "no-mutable-record".to_string(),
                     "Mutable Record<K, V> is not allowed. Use ReadonlyMap or define a specific interface".to_string(),
                     type_ref.span,
                 );
+            }
+            
+            // Check DOM types
+            if !self.allowed_features.dom {
+                const DOM_TYPES: &[&str] = &[
+                    "HTMLElement", "HTMLDivElement", "HTMLInputElement",
+                    "Document", "Window", "Navigator", "Location",
+                    "Element", "Node", "Event", "MouseEvent", "KeyboardEvent",
+                    "DOMParser", "XMLSerializer", "Storage"
+                ];
+                
+                if DOM_TYPES.contains(&name) {
+                    self.linter.add_error(
+                        "allow-directives".to_string(),
+                        format!("Type '{}' requires '@allow dom' directive", name),
+                        type_ref.span,
+                    );
+                }
+            }
+            
+            // Check network types
+            if !self.allowed_features.net {
+                const NET_TYPES: &[&str] = &[
+                    "Response", "Request", "Headers", "RequestInit",
+                    "XMLHttpRequest", "WebSocket", "EventSource",
+                    "ServiceWorker", "ServiceWorkerRegistration"
+                ];
+                
+                if NET_TYPES.contains(&name) {
+                    self.linter.add_error(
+                        "allow-directives".to_string(),
+                        format!("Type '{}' requires '@allow net' directive", name),
+                        type_ref.span,
+                    );
+                }
             }
         }
         oxc_ast::visit::walk::walk_ts_type_reference(self, type_ref);
