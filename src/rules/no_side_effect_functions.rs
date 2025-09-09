@@ -1,4 +1,4 @@
-use oxc_ast::ast::*;
+use oxc::ast::ast::*;
 
 use crate::Linter;
 
@@ -17,7 +17,7 @@ const SIDE_EFFECT_GLOBAL_FUNCTIONS: &[&str] = &[
 ];
 
 pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
-    use oxc_ast::Visit;
+    use oxc::ast_visit::Visit;
     
     struct SideEffectVisitor<'a, 'b> {
         linter: &'a mut Linter,
@@ -27,7 +27,7 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
     }
     
     impl<'a, 'b> Visit<'b> for SideEffectVisitor<'a, 'b> {
-        fn visit_function(&mut self, func: &Function<'b>, _: oxc_syntax::scope::ScopeFlags) {
+        fn visit_function(&mut self, func: &Function<'b>, _: oxc::syntax::scope::ScopeFlags) {
             let was_in_function = self.in_function;
             self.in_function = true;
             
@@ -36,7 +36,7 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
                 if param.pattern.type_annotation.is_some() {
                     // Check default parameter values
                     self.in_default_parameter = true;
-                    oxc_ast::visit::walk::walk_formal_parameter(self, param);
+                    oxc::ast_visit::walk::walk_formal_parameter(self, param);
                     self.in_default_parameter = false;
                 }
             }
@@ -56,12 +56,12 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
             // Visit parameters
             for param in &arrow.params.items {
                 self.in_default_parameter = true;
-                oxc_ast::visit::walk::walk_formal_parameter(self, param);
+                oxc::ast_visit::walk::walk_formal_parameter(self, param);
                 self.in_default_parameter = false;
             }
             
             // Visit body
-            oxc_ast::visit::walk::walk_arrow_function_expression(self, arrow);
+            oxc::ast_visit::walk::walk_arrow_function_expression(self, arrow);
             
             self.in_function = was_in_function;
         }
@@ -80,7 +80,7 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
                 }
             }
             
-            oxc_ast::visit::walk::walk_new_expression(self, new_expr);
+            oxc::ast_visit::walk::walk_new_expression(self, new_expr);
         }
         
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
@@ -123,7 +123,7 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
                 }
             }
             
-            oxc_ast::visit::walk::walk_call_expression(self, call);
+            oxc::ast_visit::walk::walk_call_expression(self, call);
         }
     }
     
@@ -141,9 +141,9 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

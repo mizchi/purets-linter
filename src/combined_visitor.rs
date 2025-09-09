@@ -1,7 +1,7 @@
-use oxc_ast::ast::*;
-use oxc_ast::Visit;
-use oxc_span::GetSpan;
-use oxc_syntax::scope::ScopeFlags;
+use oxc::ast::ast::*;
+use oxc::ast_visit::Visit;
+use oxc::span::GetSpan;
+use oxc::syntax::scope::ScopeFlags;
 use std::collections::{HashMap, HashSet};
 
 use crate::{Linter, rules::{AllowedFeatures, UsedFeatures}};
@@ -10,8 +10,8 @@ use crate::{Linter, rules::{AllowedFeatures, UsedFeatures}};
 pub struct CombinedVisitor<'a> {
     linter: &'a mut Linter,
     // State for various rules
-    exported_functions: Vec<(&'a str, oxc_span::Span)>,
-    exported_other: Vec<(&'a str, oxc_span::Span)>,
+    exported_functions: Vec<(&'a str, oxc::span::Span)>,
+    exported_other: Vec<(&'a str, oxc::span::Span)>,
     declared_vars: HashSet<String>,
     used_vars: HashSet<String>,
     in_catch_block: bool,
@@ -19,7 +19,7 @@ pub struct CombinedVisitor<'a> {
     // State for no-this-in-functions
     in_function: bool,
     // State for prefer-readonly-array
-    array_variables: HashMap<String, oxc_span::Span>,
+    array_variables: HashMap<String, oxc::span::Span>,
     mutated_arrays: HashSet<String>,
     readonly_arrays: HashSet<String>,
     // State for no-global-process
@@ -92,35 +92,35 @@ impl<'a> CombinedVisitor<'a> {
             self.linter.add_error(
                 "allow-directives".to_string(),
                 "Unused '@allow dom' directive".to_string(),
-                oxc_span::Span::new(0, 0),
+                oxc::span::Span::new(0, 0),
             );
         }
         if self.allowed_features.net && !self.used_features.net {
             self.linter.add_error(
                 "allow-directives".to_string(),
                 "Unused '@allow net' directive".to_string(),
-                oxc_span::Span::new(0, 0),
+                oxc::span::Span::new(0, 0),
             );
         }
         if self.allowed_features.timers && !self.used_features.timers {
             self.linter.add_error(
                 "allow-directives".to_string(),
                 "Unused '@allow timers' directive".to_string(),
-                oxc_span::Span::new(0, 0),
+                oxc::span::Span::new(0, 0),
             );
         }
         if self.allowed_features.console && !self.used_features.console {
             self.linter.add_error(
                 "allow-directives".to_string(),
                 "Unused '@allow console' directive".to_string(),
-                oxc_span::Span::new(0, 0),
+                oxc::span::Span::new(0, 0),
             );
         }
         if self.allowed_features.throws && !self.used_features.throws {
             self.linter.add_error(
                 "allow-directives".to_string(),
                 "Unused '@allow throws' directive".to_string(),
-                oxc_span::Span::new(0, 0),
+                oxc::span::Span::new(0, 0),
             );
         }
     }
@@ -278,7 +278,7 @@ impl<'a> CombinedVisitor<'a> {
                 self.linter.add_error(
                     "no-unused-variables".to_string(),
                     format!("Variable '{}' is declared but never used", var),
-                    oxc_span::Span::new(0, 0),
+                    oxc::span::Span::new(0, 0),
                 );
             }
         }
@@ -339,7 +339,7 @@ impl<'a> CombinedVisitor<'a> {
         }
     }
     
-    fn has_jsdoc_before(&self, span: oxc_span::Span, source_text: &str) -> bool {
+    fn has_jsdoc_before(&self, span: oxc::span::Span, source_text: &str) -> bool {
         let text_before = &source_text[..span.start as usize];
         let trimmed = text_before.trim_end();
         trimmed.ends_with("*/") && {
@@ -388,14 +388,14 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             self.in_default_parameter = true;
         }
         
-        oxc_ast::visit::walk::walk_formal_parameter(self, param);
+        oxc::ast_visit::walk::walk_formal_parameter(self, param);
         
         self.in_default_parameter = false;
     }
     // Check for classes (no-classes rule)
     // Classes are now checked by the individual no_classes rule which handles extends Error
     fn visit_class(&mut self, class: &Class<'a>) {
-        oxc_ast::visit::walk::walk_class(self, class);
+        oxc::ast_visit::walk::walk_class(self, class);
     }
     
     // Check for enums (no-enums rule)
@@ -405,7 +405,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             "Enums are not allowed in pure TypeScript subset".to_string(),
             decl.span,
         );
-        oxc_ast::visit::walk::walk_ts_enum_declaration(self, decl);
+        oxc::ast_visit::walk::walk_ts_enum_declaration(self, decl);
     }
     
     // Check for delete operator (no-delete rule)
@@ -417,7 +417,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 expr.span,
             );
         }
-        oxc_ast::visit::walk::walk_unary_expression(self, expr);
+        oxc::ast_visit::walk::walk_unary_expression(self, expr);
     }
     
     // Check for throw statements (no-throw rule)
@@ -432,7 +432,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         } else {
             self.used_features.throws = true;
         }
-        oxc_ast::visit::walk::walk_throw_statement(self, stmt);
+        oxc::ast_visit::walk::walk_throw_statement(self, stmt);
     }
     
     // Check for forEach, eval, Object.defineProperty, and track array mutations
@@ -595,7 +595,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_call_expression(self, call);
+        oxc::ast_visit::walk::walk_call_expression(self, call);
     }
     
     // Check for new Date() side effect
@@ -627,7 +627,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_new_expression(self, new_expr);
+        oxc::ast_visit::walk::walk_new_expression(self, new_expr);
     }
     
     // Check for do-while loops (no-do-while rule)
@@ -637,7 +637,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             "do-while statements are not allowed. Use while instead".to_string(),
             stmt.span,
         );
-        oxc_ast::visit::walk::walk_do_while_statement(self, stmt);
+        oxc::ast_visit::walk::walk_do_while_statement(self, stmt);
     }
     
     // Check for getters/setters (no-getters-setters rule)
@@ -661,12 +661,12 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
             _ => {}
         }
-        oxc_ast::visit::walk::walk_method_definition(self, method);
+        oxc::ast_visit::walk::walk_method_definition(self, method);
     }
     
     // Check for interfaces without extends (interface-extends-only rule)
     fn visit_ts_interface_declaration(&mut self, decl: &TSInterfaceDeclaration<'a>) {
-        if decl.extends.is_none() || decl.extends.as_ref().is_none_or(|e| e.is_empty()) {
+        if decl.extends.is_empty() {
             self.linter.add_error(
                 "interface-extends-only".to_string(),
                 format!(
@@ -676,7 +676,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 decl.span,
             );
         }
-        oxc_ast::visit::walk::walk_ts_interface_declaration(self, decl);
+        oxc::ast_visit::walk::walk_ts_interface_declaration(self, decl);
     }
     
     // Check for namespace imports, import extensions, HTTP imports, Node.js import style, and forbidden libraries
@@ -810,7 +810,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 );
             }
         
-        oxc_ast::visit::walk::walk_import_declaration(self, import);
+        oxc::ast_visit::walk::walk_import_declaration(self, import);
     }
     
     // Check for empty arrays without type (empty-array-requires-type rule) and track arrays
@@ -869,7 +869,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 }
             }
         }
-        oxc_ast::visit::walk::walk_variable_declarator(self, decl);
+        oxc::ast_visit::walk::walk_variable_declarator(self, decl);
     }
     
     // Track variable usage and check for global process/DOM access
@@ -919,14 +919,14 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_identifier_reference(self, ident);
+        oxc::ast_visit::walk::walk_identifier_reference(self, ident);
     }
     
     // Check for top-level side effects and unused map
     fn visit_expression_statement(&mut self, stmt: &ExpressionStatement<'a>) {
         // Skip these checks for error files
         if self.is_error_file {
-            oxc_ast::visit::walk::walk_expression_statement(self, stmt);
+            oxc::ast_visit::walk::walk_expression_statement(self, stmt);
             return;
         }
         
@@ -991,7 +991,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
             _ => {}
         }
-        oxc_ast::visit::walk::walk_expression_statement(self, stmt);
+        oxc::ast_visit::walk::walk_expression_statement(self, stmt);
     }
     
     // Check for this in functions and max params
@@ -1017,7 +1017,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         // Track function context for no-this-in-functions
         let was_in_function = self.in_function;
         self.in_function = true;
-        oxc_ast::visit::walk::walk_function(self, func, _flags);
+        oxc::ast_visit::walk::walk_function(self, func, _flags);
         self.in_function = was_in_function;
     }
     
@@ -1030,7 +1030,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 expr.span,
             );
         }
-        oxc_ast::visit::walk::walk_this_expression(self, expr);
+        oxc::ast_visit::walk::walk_this_expression(self, expr);
     }
     
     // Check for filename/dirname (no-filename-dirname rule)
@@ -1042,7 +1042,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 meta.span,
             );
         }
-        oxc_ast::visit::walk::walk_meta_property(self, meta);
+        oxc::ast_visit::walk::walk_meta_property(self, meta);
     }
     
     // Check for Object.assign, dynamic access, and member assignments
@@ -1078,7 +1078,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_member_expression(self, expr);
+        oxc::ast_visit::walk::walk_member_expression(self, expr);
     }
     
     // Check for member assignments, dynamic assignments, and track array mutations
@@ -1120,7 +1120,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_assignment_expression(self, expr);
+        oxc::ast_visit::walk::walk_assignment_expression(self, expr);
     }
     
     // Check for constant conditions (no-constant-condition rule)
@@ -1132,7 +1132,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 stmt.test.span(),
             );
         }
-        oxc_ast::visit::walk::walk_if_statement(self, stmt);
+        oxc::ast_visit::walk::walk_if_statement(self, stmt);
     }
     
     fn visit_while_statement(&mut self, stmt: &WhileStatement<'a>) {
@@ -1145,7 +1145,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 );
             }
         }
-        oxc_ast::visit::walk::walk_while_statement(self, stmt);
+        oxc::ast_visit::walk::walk_while_statement(self, stmt);
     }
     
     // Check for switch case blocks (switch-case-block rule)
@@ -1163,7 +1163,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 );
             }
         }
-        oxc_ast::visit::walk::walk_switch_case(self, case);
+        oxc::ast_visit::walk::walk_switch_case(self, case);
     }
     
     // Check for as casts (no-as-cast rule) - but allow 'as const'
@@ -1188,7 +1188,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             );
         }
         
-        oxc_ast::visit::walk::walk_ts_as_expression(self, expr);
+        oxc::ast_visit::walk::walk_ts_as_expression(self, expr);
     }
     
     // Check for let without type (let-requires-type rule)
@@ -1206,7 +1206,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 }
             }
         }
-        oxc_ast::visit::walk::walk_variable_declaration(self, decl);
+        oxc::ast_visit::walk::walk_variable_declaration(self, decl);
     }
     
     // Check for catch error handling (catch-error-handling rule)
@@ -1220,7 +1220,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_catch_clause(self, clause);
+        oxc::ast_visit::walk::walk_catch_clause(self, clause);
         
         self.in_catch_block = was_in_catch;
         self.current_catch_param = None;
@@ -1279,7 +1279,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 }
             }
         }
-        oxc_ast::visit::walk::walk_ts_type_reference(self, type_ref);
+        oxc::ast_visit::walk::walk_ts_type_reference(self, type_ref);
     }
     
     // Check arrow functions for max params
@@ -1297,7 +1297,7 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             );
         }
         
-        oxc_ast::visit::walk::walk_arrow_function_expression(self, arrow);
+        oxc::ast_visit::walk::walk_arrow_function_expression(self, arrow);
     }
 }
 

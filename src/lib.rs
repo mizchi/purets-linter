@@ -1,6 +1,6 @@
 // Pure TypeScript Linter Library
 
-use oxc_span::Span;
+use oxc::span::Span;
 use std::path::{Path, PathBuf};
 use crate::disable_directives::DisableDirectives;
 use crate::expect_error_directives::ExpectErrorDirectives;
@@ -79,7 +79,7 @@ impl Linter {
         self
     }
     
-    pub fn check_program(&mut self, program: &oxc_ast::ast::Program) {
+    pub fn check_program(&mut self, program: &oxc::ast::ast::Program) {
         // Use combined visitor for better performance
         use crate::combined_visitor::check_program_combined;
         check_program_combined(self, program);

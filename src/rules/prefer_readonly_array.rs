@@ -1,6 +1,6 @@
-use oxc_ast::ast::*;
-use oxc_ast::Visit;
-use oxc_span::Span;
+use oxc::ast::ast::*;
+use oxc::ast_visit::Visit;
+use oxc::span::Span;
 use std::collections::{HashMap, HashSet};
 
 use crate::Linter;
@@ -125,7 +125,7 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_variable_declarator(self, decl);
+        oxc::ast_visit::walk::walk_variable_declarator(self, decl);
     }
     
     fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
@@ -147,7 +147,7 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_call_expression(self, call);
+        oxc::ast_visit::walk::walk_call_expression(self, call);
     }
     
     fn visit_assignment_expression(&mut self, expr: &AssignmentExpression<'a>) {
@@ -161,7 +161,7 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
             }
         }
         
-        oxc_ast::visit::walk::walk_assignment_expression(self, expr);
+        oxc::ast_visit::walk::walk_assignment_expression(self, expr);
     }
 }
 
@@ -174,9 +174,9 @@ pub fn check_prefer_readonly_array(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

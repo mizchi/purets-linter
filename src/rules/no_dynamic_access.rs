@@ -1,9 +1,9 @@
-use oxc_ast::ast::*;
+use oxc::ast::ast::*;
 
 use crate::Linter;
 
 pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
-    use oxc_ast::Visit;
+    use oxc::ast_visit::Visit;
     
     struct DynamicAccessVisitor<'a, 'b> {
         linter: &'a mut Linter,
@@ -30,7 +30,7 @@ pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
                 }
             }
             
-            oxc_ast::visit::walk::walk_member_expression(self, expr);
+            oxc::ast_visit::walk::walk_member_expression(self, expr);
         }
         
         fn visit_assignment_target(&mut self, target: &AssignmentTarget<'b>) {
@@ -52,7 +52,7 @@ pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
                 }
             }
             
-            oxc_ast::visit::walk::walk_assignment_target(self, target);
+            oxc::ast_visit::walk::walk_assignment_target(self, target);
         }
     }
     
@@ -67,9 +67,9 @@ pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

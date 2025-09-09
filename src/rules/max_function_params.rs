@@ -1,12 +1,12 @@
-use oxc_ast::ast::*;
+use oxc::ast::ast::*;
 
 use crate::Linter;
 
 const MAX_PARAMS: usize = 2;
 
 pub fn check_max_function_params(linter: &mut Linter, program: &Program) {
-    use oxc_ast::Visit;
-    use oxc_syntax::scope::ScopeFlags;
+    use oxc::ast_visit::Visit;
+    use oxc::syntax::scope::ScopeFlags;
     
     struct MaxParamsVisitor<'a, 'b> {
         linter: &'a mut Linter,
@@ -31,7 +31,7 @@ pub fn check_max_function_params(linter: &mut Linter, program: &Program) {
                 );
             }
             
-            oxc_ast::visit::walk::walk_function(self, func, _flags);
+            oxc::ast_visit::walk::walk_function(self, func, _flags);
         }
         
         fn visit_arrow_function_expression(&mut self, arrow: &ArrowFunctionExpression<'b>) {
@@ -47,7 +47,7 @@ pub fn check_max_function_params(linter: &mut Linter, program: &Program) {
                 );
             }
             
-            oxc_ast::visit::walk::walk_arrow_function_expression(self, arrow);
+            oxc::ast_visit::walk::walk_arrow_function_expression(self, arrow);
         }
     }
     
@@ -62,9 +62,9 @@ pub fn check_max_function_params(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

@@ -1,5 +1,5 @@
-use oxc_ast::ast::*;
-use oxc_span::Span;
+use oxc::ast::ast::*;
+use oxc::span::Span;
 
 use crate::{Linter, TestRunner};
 
@@ -492,9 +492,9 @@ fn contains_test_code(stmt: &Statement) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
 
     fn parse_and_check(source: &str, file_path: &str) -> Vec<String> {
         use std::path::Path;

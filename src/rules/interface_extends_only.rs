@@ -1,5 +1,5 @@
-use oxc_ast::ast::*;
-use oxc_ast::Visit;
+use oxc::ast::ast::*;
+use oxc::ast_visit::{Visit, walk};
 
 use crate::Linter;
 
@@ -11,7 +11,7 @@ pub fn check_interface_extends_only(linter: &mut Linter, program: &Program) {
     impl<'a> Visit<'a> for InterfaceChecker<'a> {
         fn visit_ts_interface_declaration(&mut self, decl: &TSInterfaceDeclaration<'a>) {
             // Check if interface has extends clause
-            if decl.extends.is_none() || decl.extends.as_ref().is_none_or(|e| e.is_empty()) {
+            if decl.extends.is_empty() {
                 self.linter.add_error(
                     "interface-extends-only".to_string(),
                     format!(
@@ -21,6 +21,7 @@ pub fn check_interface_extends_only(linter: &mut Linter, program: &Program) {
                     decl.span,
                 );
             }
+            walk::walk_ts_interface_declaration(self, decl);
         }
     }
     
@@ -32,20 +33,20 @@ pub fn check_interface_extends_only(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {
         let allocator = Allocator::default();
-        let source_type = SourceType::default();
+        let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
         
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_interface_extends_only(&mut linter, &ret.program);
         
-        linter.errors.into_iter().map(|e| e.rule).collect()
+        linter.errors.into_iter().map(|e| e.message).collect()
     }
 
     #[test]
@@ -58,8 +59,8 @@ mod tests {
         "#;
         
         let errors = parse_and_check(source);
-        assert_eq!(errors.len(), 0); // TODO: Fix implementation
-        // assert!(errors.contains(&"interface-extends-only".to_string()));
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("without extends is not allowed"));
     }
 
     #[test]
@@ -75,7 +76,8 @@ mod tests {
         "#;
         
         let errors = parse_and_check(source);
-        assert_eq!(errors.len(), 0); // TODO: Fix implementation
+        assert_eq!(errors.len(), 1); // User interface doesn't extend anything
+        assert!(errors[0].contains("Interface 'User' without extends"));
     }
 
     #[test]
@@ -89,7 +91,9 @@ mod tests {
         "#;
         
         let errors = parse_and_check(source);
-        assert_eq!(errors.len(), 0); // TODO: Fix implementation
+        assert_eq!(errors.len(), 2); // A and B don't extend anything
+        assert!(errors.iter().any(|e| e.contains("Interface 'A' without extends")));
+        assert!(errors.iter().any(|e| e.contains("Interface 'B' without extends")));
     }
 
     #[test]

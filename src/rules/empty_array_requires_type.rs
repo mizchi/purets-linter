@@ -1,5 +1,5 @@
-use oxc_ast::ast::*;
-use oxc_ast::Visit;
+use oxc::ast::ast::*;
+use oxc::ast_visit::Visit;
 use crate::Linter;
 
 pub fn check_empty_array_requires_type(linter: &mut Linter, program: &Program) {

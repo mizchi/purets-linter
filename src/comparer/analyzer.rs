@@ -1,8 +1,8 @@
-use oxc_allocator::Allocator;
-use oxc_ast::ast::*;
-use oxc_ast::Visit;
-use oxc_parser::Parser;
-use oxc_span::SourceType;
+use oxc::allocator::Allocator;
+use oxc::ast::ast::*;
+use oxc::ast_visit::Visit;
+use oxc::parser::Parser;
+use oxc::span::SourceType;
 use std::fs;
 use std::path::Path;
 use anyhow::Result;
@@ -100,7 +100,7 @@ impl<'a> Visit<'a> for CodeAnalyzer<'a> {
         }
     }
     
-    fn visit_function(&mut self, func: &Function<'a>, _flags: oxc_syntax::scope::ScopeFlags) {
+    fn visit_function(&mut self, func: &Function<'a>, _flags: oxc::syntax::scope::ScopeFlags) {
         self.metrics.function_count += 1;
         self.metrics.symbol_count += 1;
         self.enter_block();
@@ -123,7 +123,7 @@ impl<'a> Visit<'a> for CodeAnalyzer<'a> {
             match element {
                 ClassElement::MethodDefinition(method) => {
                     self.metrics.symbol_count += 1;
-                    self.visit_function(&method.value, oxc_syntax::scope::ScopeFlags::empty());
+                    self.visit_function(&method.value, oxc::syntax::scope::ScopeFlags::empty());
                 }
                 ClassElement::PropertyDefinition(_prop) => {
                     self.metrics.symbol_count += 1;

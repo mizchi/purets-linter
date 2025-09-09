@@ -1,4 +1,4 @@
-use oxc_ast::ast::*;
+use oxc::ast::ast::*;
 
 use crate::Linter;
 
@@ -57,7 +57,7 @@ impl AllowedFeatures {
 }
 
 pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFeatures {
-    use oxc_ast::Visit;
+    use oxc::ast_visit::Visit;
     
     let allowed = AllowedFeatures::from_jsdoc(&linter.source_text);
     
@@ -70,11 +70,11 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
     }
     
     impl<'a, 'b> Visit<'b> for AllowDirectiveVisitor<'a, 'b> {
-        fn visit_function(&mut self, func: &Function<'b>, _: oxc_syntax::scope::ScopeFlags) {
+        fn visit_function(&mut self, func: &Function<'b>, _: oxc::syntax::scope::ScopeFlags) {
             let was_in_function = self.in_function;
             self.in_function = true;
             
-            oxc_ast::visit::walk::walk_function(self, func, oxc_syntax::scope::ScopeFlags::empty());
+            oxc::ast_visit::walk::walk_function(self, func, oxc::syntax::scope::ScopeFlags::empty());
             
             self.in_function = was_in_function;
         }
@@ -83,7 +83,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
             let was_in_function = self.in_function;
             self.in_function = true;
             
-            oxc_ast::visit::walk::walk_arrow_function_expression(self, arrow);
+            oxc::ast_visit::walk::walk_arrow_function_expression(self, arrow);
             
             self.in_function = was_in_function;
         }
@@ -128,7 +128,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                 }
             }
             
-            oxc_ast::visit::walk::walk_identifier_reference(self, ident);
+            oxc::ast_visit::walk::walk_identifier_reference(self, ident);
         }
         
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
@@ -173,7 +173,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                 }
             }
             
-            oxc_ast::visit::walk::walk_call_expression(self, call);
+            oxc::ast_visit::walk::walk_call_expression(self, call);
         }
         
         fn visit_throw_statement(&mut self, throw_stmt: &ThrowStatement<'b>) {
@@ -229,7 +229,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                 }
             }
             
-            oxc_ast::visit::walk::walk_throw_statement(self, throw_stmt);
+            oxc::ast_visit::walk::walk_throw_statement(self, throw_stmt);
         }
         
         fn visit_ts_type_reference(&mut self, type_ref: &TSTypeReference<'b>) {
@@ -272,7 +272,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                 }
             }
             
-            oxc_ast::visit::walk::walk_ts_type_reference(self, type_ref);
+            oxc::ast_visit::walk::walk_ts_type_reference(self, type_ref);
         }
     }
     
@@ -291,28 +291,28 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
         visitor.linter.add_error(
             "allow-directives".to_string(),
             "Unused '@allow dom' directive".to_string(),
-            oxc_span::Span::new(0, 0),
+            oxc::span::Span::new(0, 0),
         );
     }
     if allowed.net && !visitor.used.net {
         visitor.linter.add_error(
             "allow-directives".to_string(),
             "Unused '@allow net' directive".to_string(),
-            oxc_span::Span::new(0, 0),
+            oxc::span::Span::new(0, 0),
         );
     }
     if allowed.timers && !visitor.used.timers {
         visitor.linter.add_error(
             "allow-directives".to_string(),
             "Unused '@allow timers' directive".to_string(),
-            oxc_span::Span::new(0, 0),
+            oxc::span::Span::new(0, 0),
         );
     }
     if allowed.console && !visitor.used.console {
         visitor.linter.add_error(
             "allow-directives".to_string(),
             "Unused '@allow console' directive".to_string(),
-            oxc_span::Span::new(0, 0),
+            oxc::span::Span::new(0, 0),
         );
     }
     
@@ -323,9 +323,9 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

@@ -1,6 +1,6 @@
-use oxc_ast::ast::*;
-use oxc_ast::visit::walk;
-use oxc_ast::Visit;
+use oxc::ast::ast::*;
+use oxc::ast_visit::walk;
+use oxc::ast_visit::Visit;
 
 use crate::Linter;
 
@@ -258,7 +258,7 @@ pub fn check_strict_named_export(linter: &mut Linter, program: &Program) {
         checker.linter.add_error(
             "strict-named-export".to_string(),
             message,
-            oxc_span::Span::new(0, 0),
+            oxc::span::Span::new(0, 0),
         );
     }
 }

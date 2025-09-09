@@ -1,9 +1,9 @@
-use oxc_ast::ast::*;
+use oxc::ast::ast::*;
 
 use crate::Linter;
 
 pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program, file_path: &str) {
-    use oxc_ast::Visit;
+    use oxc::ast_visit::Visit;
     
     struct JsDocVisitor<'a, 'b> {
         linter: &'a mut Linter,
@@ -13,7 +13,7 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program, file_
     }
     
     impl<'a, 'b> JsDocVisitor<'a, 'b> {
-        fn has_jsdoc_before(&self, span: oxc_span::Span) -> bool {
+        fn has_jsdoc_before(&self, span: oxc::span::Span) -> bool {
             // Check if there's a JSDoc comment immediately before this position
             let text_before = &self.source_text[..span.start as usize];
             
@@ -48,7 +48,7 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program, file_
                 }
             }
             
-            oxc_ast::visit::walk::walk_export_default_declaration(self, export);
+            oxc::ast_visit::walk::walk_export_default_declaration(self, export);
         }
         
         fn visit_export_named_declaration(&mut self, export: &ExportNamedDeclaration<'b>) {
@@ -103,7 +103,7 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program, file_
                 }
             }
             
-            oxc_ast::visit::walk::walk_export_named_declaration(self, export);
+            oxc::ast_visit::walk::walk_export_named_declaration(self, export);
         }
     }
     
@@ -123,9 +123,9 @@ pub fn check_export_requires_jsdoc(linter: &mut Linter, program: &Program, file_
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

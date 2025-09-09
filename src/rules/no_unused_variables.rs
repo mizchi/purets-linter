@@ -1,16 +1,16 @@
-use oxc_ast::ast::*;
-use oxc_ast::visit::walk;
-use oxc_ast::Visit;
-use oxc_syntax::scope::ScopeFlags;
+use oxc::ast::ast::*;
+use oxc::ast_visit::walk;
+use oxc::ast_visit::Visit;
+use oxc::syntax::scope::ScopeFlags;
 use std::collections::{HashMap, HashSet};
 
 use crate::Linter;
 
 pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
     struct VariableUsageChecker<'a> {
-        declared_vars: HashMap<String, oxc_span::Span>,
+        declared_vars: HashMap<String, oxc::span::Span>,
         used_vars: HashSet<String>,
-        imported_vars: HashMap<String, oxc_span::Span>,
+        imported_vars: HashMap<String, oxc::span::Span>,
         used_imports: HashSet<String>,
         linter: &'a mut Linter,
     }
@@ -104,9 +104,9 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::{Parser, ParserReturn};
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::{Parser, ParserReturn};
+    use oxc::span::SourceType;
     use std::path::Path;
 
 

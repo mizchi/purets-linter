@@ -1,6 +1,6 @@
 use crate::Linter;
-use oxc_ast::ast::*;
-use oxc_span::GetSpan;
+use oxc::ast::ast::*;
+use oxc::span::GetSpan;
 
 pub fn check_no_top_level_side_effects(linter: &mut Linter, program: &Program) {
     // Allow main() calls in main.ts files
@@ -124,9 +124,9 @@ fn is_type_guard_only(_if_stmt: &IfStatement) -> bool {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

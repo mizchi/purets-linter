@@ -1,6 +1,6 @@
-use oxc_ast::ast::*;
-use oxc_ast::visit::walk;
-use oxc_ast::Visit;
+use oxc::ast::ast::*;
+use oxc::ast_visit::walk;
+use oxc::ast_visit::Visit;
 
 use crate::Linter;
 
@@ -30,9 +30,9 @@ pub fn check_no_delete(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {

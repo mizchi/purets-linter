@@ -1,6 +1,6 @@
-use oxc_ast::ast::*;
-use oxc_ast::visit::walk;
-use oxc_ast::Visit;
+use oxc::ast::ast::*;
+use oxc::ast_visit::walk;
+use oxc::ast_visit::Visit;
 
 use crate::Linter;
 
@@ -35,20 +35,20 @@ pub fn check_no_member_assignments(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {
         let allocator = Allocator::default();
-        let source_type = SourceType::default();
+        let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
         
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_member_assignments(&mut linter, &ret.program);
         
-        linter.errors.into_iter().map(|e| e.rule).collect()
+        linter.errors.into_iter().map(|e| e.message).collect()
     }
 
     #[test]
@@ -59,7 +59,8 @@ mod tests {
         "#;
         
         let errors = parse_and_check(source);
-        assert!(errors.contains(&"no-member-assignments".to_string()));
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Member assignments"));
     }
 
     #[test]
@@ -70,7 +71,8 @@ mod tests {
         "#;
         
         let errors = parse_and_check(source);
-        assert!(errors.contains(&"no-member-assignments".to_string()));
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Member assignments"));
     }
 
     #[test]
@@ -81,7 +83,8 @@ mod tests {
         "#;
         
         let errors = parse_and_check(source);
-        assert!(errors.contains(&"no-member-assignments".to_string()));
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Member assignments"));
     }
 
     #[test]
@@ -110,6 +113,7 @@ mod tests {
         "#;
         
         let errors = parse_and_check(source);
-        assert!(errors.contains(&"no-member-assignments".to_string()));
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Member assignments"));
     }
 }

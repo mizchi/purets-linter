@@ -1,7 +1,7 @@
-use oxc_ast::ast::*;
-use oxc_ast::visit::walk;
-use oxc_ast::Visit;
-use oxc_syntax::scope::ScopeFlags;
+use oxc::ast::ast::*;
+use oxc::ast_visit::walk;
+use oxc::ast_visit::Visit;
+use oxc::syntax::scope::ScopeFlags;
 
 use crate::Linter;
 
@@ -42,7 +42,7 @@ pub fn check_jsdoc_param_match(linter: &mut Linter, program: &Program) {
     }
     
     impl<'a> JsDocParamChecker<'a> {
-        fn check_jsdoc_params(&mut self, func_name: &str, params: &[FormalParameter<'a>], span: oxc_span::Span) {
+        fn check_jsdoc_params(&mut self, func_name: &str, params: &[FormalParameter<'a>], span: oxc::span::Span) {
             // Skip if no parameters
             if params.is_empty() {
                 return;

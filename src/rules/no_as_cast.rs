@@ -1,6 +1,6 @@
-use oxc_ast::ast::*;
-use oxc_ast::visit::walk;
-use oxc_ast::Visit;
+use oxc::ast::ast::*;
+use oxc::ast_visit::walk;
+use oxc::ast_visit::Visit;
 
 use crate::Linter;
 
@@ -11,6 +11,24 @@ pub fn check_no_as_upcast(linter: &mut Linter, program: &Program) {
     
     impl<'a> Visit<'a> for AsUpcastChecker<'a> {
         fn visit_ts_as_expression(&mut self, expr: &TSAsExpression<'a>) {
+            // Check if it's 'as const' which is allowed
+            let is_const_assertion = match &expr.type_annotation {
+                TSType::TSTypeReference(type_ref) => {
+                    if let TSTypeName::IdentifierReference(id) = &type_ref.type_name {
+                        id.name == "const"
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+            
+            if is_const_assertion {
+                // 'as const' is allowed
+                walk::walk_ts_as_expression(self, expr);
+                return;
+            }
+            
             // Check for common upcast patterns
             let is_likely_upcast = match &expr.type_annotation {
                 // Casting to any, unknown, object are always upcasts
@@ -28,6 +46,7 @@ pub fn check_no_as_upcast(linter: &mut Linter, program: &Program) {
                         "Type assertion with 'as' is discouraged. Consider using 'satisfies' for type checking or narrowing the type properly".to_string(),
                         expr.span,
                     );
+                    walk::walk_ts_as_expression(self, expr);
                     return;
                 }
                 
@@ -73,21 +92,21 @@ pub fn check_no_as_upcast(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn parse_and_check(source: &str) -> Vec<String> {
         let allocator = Allocator::default();
-        let source_type = SourceType::default();
+        let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
         
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_as_upcast(&mut linter, &ret.program);
         
         
-        linter.errors.into_iter().map(|e| e.rule).collect()
+        linter.errors.into_iter().map(|e| e.message).collect()
     }
 
     #[test]
@@ -96,9 +115,9 @@ mod tests {
             const value = "hello" as any;
         "#;
         
-        // TODO: Fix no_as_cast rule implementation - currently not detecting as any violations
         let errors = parse_and_check(source);
-        assert!(errors.is_empty()); // Adjusted to match actual behavior
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Upcast with 'as' is not allowed"))
     }
 
     #[test]
@@ -107,9 +126,9 @@ mod tests {
             const data = { x: 1 } as unknown;
         "#;
         
-        // TODO: Fix no_as_cast rule implementation - currently not detecting as unknown violations
         let errors = parse_and_check(source);
-        assert!(errors.is_empty()); // Adjusted to match actual behavior
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Upcast with 'as' is not allowed"))
     }
 
     #[test]
@@ -119,9 +138,9 @@ mod tests {
             const str = "hello" as string;
         "#;
         
-        // TODO: Fix no_as_cast rule implementation - currently not detecting primitive cast violations
         let errors = parse_and_check(source);
-        assert!(errors.is_empty()); // Adjusted to match actual behavior
+        assert_eq!(errors.len(), 2);
+        assert!(errors[0].contains("Type assertion with 'as' is discouraged"))
     }
 
     #[test]
@@ -130,9 +149,10 @@ mod tests {
             const oldStyle = <string>"hello";
         "#;
         
-        // TODO: Fix no_as_cast rule implementation - currently not detecting angle bracket assertions
         let errors = parse_and_check(source);
-        assert!(errors.is_empty()); // Adjusted to match actual behavior
+        // Now it correctly detects angle bracket assertions
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Type assertion <Type>value is not allowed"));
     }
 
     #[test]

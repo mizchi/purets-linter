@@ -1,5 +1,5 @@
-use oxc_ast::ast::*;
-use oxc_ast::Visit;
+use oxc::ast::ast::*;
+use oxc::ast_visit::Visit;
 
 use crate::Linter;
 
@@ -68,9 +68,9 @@ pub fn check_import_extensions(linter: &mut Linter, program: &Program) {
 mod tests {
     use super::*;
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::{Parser, ParserReturn};
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::{Parser, ParserReturn};
+    use oxc::span::SourceType;
     use std::path::Path;
 
     fn run_test_with_code(source_text: &str, expected_error_count: usize, expected_messages: &[&str]) {

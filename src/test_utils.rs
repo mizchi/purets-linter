@@ -2,15 +2,15 @@
 #[cfg(test)]
 pub mod test {
     use crate::Linter;
-    use oxc_allocator::Allocator;
-    use oxc_parser::Parser;
-    use oxc_span::SourceType;
+    use oxc::allocator::Allocator;
+    use oxc::parser::Parser;
+    use oxc::span::SourceType;
     use std::path::Path;
     
     /// Parse and check with a specific rule
     pub fn check_rule<F>(source: &str, check_fn: F) -> Vec<String>
     where
-        F: FnOnce(&mut Linter, &oxc_ast::ast::Program),
+        F: FnOnce(&mut Linter, &oxc::ast::ast::Program),
     {
         let allocator = Allocator::default();
         let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
@@ -23,7 +23,7 @@ pub mod test {
     /// Parse and check with a specific file path
     pub fn check_rule_with_path<F>(source: &str, path: &str, check_fn: F) -> Vec<String>
     where
-        F: FnOnce(&mut Linter, &oxc_ast::ast::Program),
+        F: FnOnce(&mut Linter, &oxc::ast::ast::Program),
     {
         let allocator = Allocator::default();
         let source_type = SourceType::from_path(Path::new(path)).unwrap();
