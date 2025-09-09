@@ -53,7 +53,7 @@ purets --test vitest
 - `src/pure/` - Pure functions only, no async operations
 - `src/types/` - Type definitions only, multiple exports allowed
 - `src/io/` - I/O operations, sync-only allowed
-- `tests/*_test.ts`
+- `tests/*.test.ts` or `tests/*_test.ts`
 
 ### Naming Conventions
 

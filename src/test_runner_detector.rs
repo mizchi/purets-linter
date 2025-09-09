@@ -111,8 +111,9 @@ impl TestRunnerDetector {
                         if ext == "ts" || ext == "js" || ext == "mjs" || ext == "tsx" || ext == "jsx" {
                             if let Some(name) = path.file_name() {
                                 let name_str = name.to_string_lossy();
-                                // Check if it's a test file
-                                if name_str.contains("test") || name_str.contains("spec") {
+                                // Check if it's a test file (Vitest pattern: .test.ts, .spec.ts)
+                                if name_str.contains(".test.") || name_str.contains(".spec.") || 
+                                   name_str.contains("_test.") || name_str.contains("_spec.") {
                                     if self.file_has_node_test_import(&path) {
                                         return true;
                                     }

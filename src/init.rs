@@ -1,22 +1,22 @@
+use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
-use anyhow::{Context, Result};
 
 /// Initialize a new pure-ts project with the recommended structure
 pub fn init_project(path: &Path) -> Result<()> {
     println!("Initializing pure-ts project at: {}", path.display());
-    
+
     // Create directory structure
     create_directory_structure(path)?;
-    
+
     // Generate configuration files
     generate_package_json(path)?;
     generate_tsconfig(path)?;
     generate_gitignore(path)?;
-    
+
     // Generate boilerplate source files
     generate_source_files(path)?;
-    
+
     println!("✓ Project initialized successfully!");
     println!("\nProject structure:");
     println!("  src/");
@@ -29,7 +29,7 @@ pub fn init_project(path: &Path) -> Result<()> {
     println!("  cd {}", path.display());
     println!("  pnpm install");
     println!("  pnpm check");
-    
+
     Ok(())
 }
 
@@ -37,14 +37,14 @@ fn create_directory_structure(base_path: &Path) -> Result<()> {
     // Create base directory
     fs::create_dir_all(base_path)
         .with_context(|| format!("Failed to create directory: {}", base_path.display()))?;
-    
+
     // Create src and subdirectories
     let src_path = base_path.join("src");
     fs::create_dir_all(&src_path)?;
     fs::create_dir_all(src_path.join("io"))?;
     fs::create_dir_all(src_path.join("pure"))?;
     fs::create_dir_all(src_path.join("types"))?;
-    
+
     Ok(())
 }
 
@@ -61,7 +61,7 @@ fn generate_package_json(base_path: &Path) -> Result<()> {
   },
   "scripts": {
     "check": "pnpm typecheck && pnpm lint:purets",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo",
     "lint:purets": "purets",
     "build": "tsdown",
     "test": "vitest --run",
@@ -71,6 +71,7 @@ fn generate_package_json(base_path: &Path) -> Result<()> {
     "neverthrow": "^8.2.0"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20250909.1",
     "@types/node": "^24.3.1",
     "tsdown": "^0.15.0",
     "typescript": "^5.9.2",
@@ -78,46 +79,38 @@ fn generate_package_json(base_path: &Path) -> Result<()> {
   }
 }
 "#;
-    
+
     let path = base_path.join("package.json");
     fs::write(&path, package_json)
         .with_context(|| format!("Failed to write package.json: {}", path.display()))?;
-    
+
     Ok(())
 }
 
 fn generate_tsconfig(base_path: &Path) -> Result<()> {
     let tsconfig = r#"{
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
+    "target": "es2024",
+    "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  }
 }
 "#;
-    
+
     let path = base_path.join("tsconfig.json");
     fs::write(&path, tsconfig)
         .with_context(|| format!("Failed to write tsconfig.json: {}", path.display()))?;
-    
+
     Ok(())
 }
 
@@ -131,17 +124,17 @@ coverage/
 .vscode/
 .idea/
 "#;
-    
+
     let path = base_path.join(".gitignore");
     fs::write(&path, gitignore)
         .with_context(|| format!("Failed to write .gitignore: {}", path.display()))?;
-    
+
     Ok(())
 }
 
 fn generate_source_files(base_path: &Path) -> Result<()> {
     let src_path = base_path.join("src");
-    
+
     // Generate index.ts
     let index_content = r#"/**
  * Export Policy:
@@ -156,7 +149,7 @@ export { add } from "./pure/add.ts";
 export { readConfig } from "./io/readConfig.ts";
 "#;
     fs::write(src_path.join("index.ts"), index_content)?;
-    
+
     // Generate main.ts
     let main_content = r#"import { readConfig } from "./io/readConfig.ts";
 import process from "node:process";
@@ -178,7 +171,7 @@ async function main(): Promise<void> {
 main();
 "#;
     fs::write(src_path.join("main.ts"), main_content)?;
-    
+
     // Generate pure/add.ts
     let add_content = r#"/**
  * Adds two numbers together
@@ -191,7 +184,7 @@ export function add(a: number, b: number): number {
 }
 "#;
     fs::write(src_path.join("pure").join("add.ts"), add_content)?;
-    
+
     // Generate types/User.ts
     let user_type = r#"export type User = {
   readonly id: string;
@@ -199,7 +192,7 @@ export function add(a: number, b: number): number {
 };
 "#;
     fs::write(src_path.join("types").join("User.ts"), user_type)?;
-    
+
     // Generate io/readConfig.ts
     let read_config = r#"import fs from "node:fs/promises";
 import { Result, ok, err } from "neverthrow";
@@ -220,6 +213,6 @@ export async function readConfig(): Promise<
 }
 "#;
     fs::write(src_path.join("io").join("readConfig.ts"), read_config)?;
-    
+
     Ok(())
 }

@@ -245,10 +245,14 @@ impl GitignoreFilter {
         ];
         
         for dir in &exclude_dirs {
+            // Check various patterns for directory inclusion
             if path_str.contains(&format!("/{}/", dir))
                 || path_str.contains(&format!("\\{}\\", dir))
                 || path_str.contains(&format!("/{}", dir))
-                || path_str.contains(&format!("\\{}", dir)) {
+                || path_str.contains(&format!("\\{}", dir))
+                || path_str.starts_with(&format!("{}/", dir))
+                || path_str.starts_with(&format!("{}\\", dir))
+                || path_str == *dir {
                 return true;
             }
         }

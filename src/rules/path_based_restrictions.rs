@@ -9,7 +9,7 @@ use crate::{Linter, TestRunner};
 /// - io/**/*.ts: Only async functions are allowed
 /// - pure/**/*.ts: Pure functions only, export function name must match filename
 /// - types/**/*.ts: Only one type export allowed, must match filename
-/// - *_test.ts: Must import function with same name (minus _test suffix)
+/// - *.test.ts or *_test.ts: Must import function with same name (minus test suffix)
 pub fn check_path_based_restrictions(
     linter: &mut Linter,
     program: &Program,
@@ -18,7 +18,7 @@ pub fn check_path_based_restrictions(
     let normalized_path = file_path.replace('\\', "/");
     
     // Check test files first (they can be in any directory)
-    if normalized_path.ends_with("_test.ts") {
+    if normalized_path.ends_with("_test.ts") || normalized_path.ends_with(".test.ts") {
         // Default to vitest if no test runner specified
         if linter.test_runner.is_none() {
             linter.test_runner = Some(crate::TestRunner::Vitest);
@@ -341,18 +341,26 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
     }
 }
 
-/// Check that *_test.ts files import the function with matching name
+/// Check that *.test.ts or *_test.ts files import the function with matching name
 fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &str) {
     // If a test runner is specified, check for appropriate imports
     if let Some(test_runner) = linter.test_runner.clone() {
         check_test_runner_imports(linter, program, &test_runner);
     }
-    // Extract base filename without _test.ts suffix
+    // Extract base filename without test suffix
     let filename = file_path
         .rsplit('/')
         .next()
-        .unwrap_or("")
-        .trim_end_matches("_test.ts");
+        .unwrap_or("");
+    
+    // Remove test suffix (.test.ts or _test.ts)
+    let filename = if filename.ends_with(".test.ts") {
+        filename.trim_end_matches(".test.ts")
+    } else if filename.ends_with("_test.ts") {
+        filename.trim_end_matches("_test.ts")
+    } else {
+        filename
+    };
     
     if filename.is_empty() {
         return;
@@ -616,7 +624,7 @@ mod tests {
                 it("should work", () => {});
             });
         "#;
-        let errors = parse_and_check(source, "src/add_test.ts");
+        let errors = parse_and_check(source, "src/add.test.ts");
         assert_eq!(errors.len(), 2);
         assert!(errors.iter().any(|e| e.contains("must import function 'add'")));
 
@@ -626,7 +634,7 @@ mod tests {
                 it("should work", () => {});
             });
         "#;
-        let errors = parse_and_check(source, "src/add_test.ts");
+        let errors = parse_and_check(source, "src/add.test.ts");
         assert_eq!(errors.len(), 2);
         assert!(errors.iter().any(|e| e.contains("must have at least one import") || e.contains("must import from 'vitest'")));
 
@@ -640,7 +648,7 @@ mod tests {
                 });
             });
         "#;
-        let errors = parse_and_check(source, "src/add_test.ts");
+        let errors = parse_and_check(source, "src/add.test.ts");
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("should import from 'vitest'"));
 
@@ -652,7 +660,7 @@ mod tests {
                 it("should work", () => {});
             });
         "#;
-        let errors = parse_and_check(source, "src/calculate_test.ts");
+        let errors = parse_and_check(source, "src/calculate.test.ts");
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("should import from 'vitest'"));
     }
