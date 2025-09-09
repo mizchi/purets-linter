@@ -11,15 +11,15 @@ pub fn check_no_unused_map(linter: &mut Linter, program: &Program) {
         fn visit_expression_statement(&mut self, stmt: &ExpressionStatement<'a>) {
             if let Expression::CallExpression(call) = &stmt.expression {
                 // Check if it's a .map() call
-                if let Some(member) = call.callee.as_member_expression() {
-                    if let MemberExpression::StaticMemberExpression(static_member) = &member {
-                        if static_member.property.name == "map" {
-                            self.linter.add_error(
+                if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+                    call.callee.as_member_expression()
+                {
+                    if static_member.property.name == "map" {
+                        self.linter.add_error(
                                 "no-unused-map".to_string(),
                                 "map() return value must be used. Use forEach() for side effects or assign the result".to_string(),
                                 stmt.span,
                             );
-                        }
                     }
                 }
             }

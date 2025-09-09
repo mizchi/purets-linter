@@ -190,7 +190,7 @@ fn main() -> Result<()> {
 
     // Parse test runner if specified, or auto-detect
     let test_runner = if let Some(test_str) = &args.test {
-        match TestRunner::from_str(test_str) {
+        match TestRunner::from_string(test_str) {
             Some(runner) => {
                 println!("Using test runner: {}", runner);
                 Some(runner)
@@ -256,20 +256,16 @@ fn main() -> Result<()> {
             let runner = test_runner.clone();
             // Compare canonical paths or check if the file path ends with the entry/main path
             let is_entry = entry_paths.iter().any(|ep| {
-                let matches = file_path == ep
-                    || ep
-                        .file_name()
-                        .map_or(false, |name| file_path.ends_with(name));
+                let matches =
+                    file_path == ep || ep.file_name().is_some_and(|name| file_path.ends_with(name));
                 if verbose && matches {
                     eprintln!("DEBUG: Marking {} as entry point", file_path.display());
                 }
                 matches
             });
             let is_main = main_paths.iter().any(|mp| {
-                let matches = file_path == mp
-                    || mp
-                        .file_name()
-                        .map_or(false, |name| file_path.ends_with(name));
+                let matches =
+                    file_path == mp || mp.file_name().is_some_and(|name| file_path.ends_with(name));
                 if verbose && matches {
                     eprintln!("DEBUG: Marking {} as main entry", file_path.display());
                 }
@@ -363,21 +359,17 @@ fn collect_files(path: &str) -> Result<Vec<PathBuf>> {
         files.push(path.to_path_buf());
     } else if path.is_dir() {
         let pattern = format!("{}/**/*.ts", path.display());
-        for entry in glob(&pattern)? {
-            if let Ok(path) = entry {
-                // Use gitignore filter instead of simple node_modules check
-                if !filter.contains_excluded_dir(&path) {
-                    files.push(path);
-                }
+        for path in glob(&pattern)?.flatten() {
+            // Use gitignore filter instead of simple node_modules check
+            if !filter.contains_excluded_dir(&path) {
+                files.push(path);
             }
         }
 
         let pattern = format!("{}/**/*.tsx", path.display());
-        for entry in glob(&pattern)? {
-            if let Ok(path) = entry {
-                if !filter.contains_excluded_dir(&path) {
-                    files.push(path);
-                }
+        for path in (glob(&pattern)?).flatten() {
+            if !filter.contains_excluded_dir(&path) {
+                files.push(path);
             }
         }
     }
@@ -396,7 +388,7 @@ fn check_file_with_options(
 ) -> Result<usize> {
     let source_text = fs::read_to_string(path)?;
     let allocator = Allocator::default();
-    let source_type = SourceType::from_path(path).unwrap_or(SourceType::default());
+    let source_type = SourceType::from_path(path).unwrap_or_default();
 
     let ParserReturn {
         program,

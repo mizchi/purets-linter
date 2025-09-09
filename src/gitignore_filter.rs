@@ -142,7 +142,7 @@ impl GitignoreFilter {
                 '[' => {
                     glob.push('[');
                     // Copy character class as-is
-                    while let Some(ch) = chars.next() {
+                    for ch in chars.by_ref() {
                         glob.push(ch);
                         if ch == ']' {
                             break;
@@ -192,11 +192,7 @@ impl GitignoreFilter {
                 let matches = glob.matches(&path_str);
 
                 if matches {
-                    if pattern.is_negation {
-                        should_ignore = false;
-                    } else {
-                        should_ignore = true;
-                    }
+                    should_ignore = !pattern.is_negation;
                 }
             } else {
                 // Fallback to simple string matching
@@ -207,11 +203,7 @@ impl GitignoreFilter {
                 };
 
                 if matches {
-                    if pattern.is_negation {
-                        should_ignore = false;
-                    } else {
-                        should_ignore = true;
-                    }
+                    should_ignore = !pattern.is_negation;
                 }
             }
         }

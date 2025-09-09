@@ -83,15 +83,16 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
             if self.in_function && !self.in_default_parameter {
                 // Check for Math.random(), Date.now()
-                if let Some(member) = call.callee.as_member_expression() {
-                    if let MemberExpression::StaticMemberExpression(static_member) = &member {
-                        if let Expression::Identifier(obj) = &static_member.object {
-                            let obj_name = obj.name.as_str();
-                            let method_name = static_member.property.name.as_str();
+                if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+                    call.callee.as_member_expression()
+                {
+                    if let Expression::Identifier(obj) = &static_member.object {
+                        let obj_name = obj.name.as_str();
+                        let method_name = static_member.property.name.as_str();
 
-                            for (object, method) in SIDE_EFFECT_FUNCTIONS {
-                                if obj_name == *object && method_name == *method {
-                                    self.linter.add_error(
+                        for (object, method) in SIDE_EFFECT_FUNCTIONS {
+                            if obj_name == *object && method_name == *method {
+                                self.linter.add_error(
                                         "no-side-effect-functions".to_string(),
                                         format!(
                                             "Direct use of '{}.{}()' is not allowed in functions. Pass it as a parameter or use a default parameter instead",
@@ -99,7 +100,6 @@ pub fn check_no_side_effect_functions(linter: &mut Linter, program: &Program) {
                                         ),
                                         call.span,
                                     );
-                                }
                             }
                         }
                     }

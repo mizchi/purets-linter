@@ -10,7 +10,7 @@ pub enum TestRunner {
 
 impl TestRunner {
     /// Parse test runner from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "vitest" => Some(TestRunner::Vitest),
             "node-test" => Some(TestRunner::NodeTest),

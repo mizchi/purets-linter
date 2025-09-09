@@ -176,20 +176,19 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
             }
 
             // Check console access
-            if let Some(member) = call.callee.as_member_expression() {
-                if let MemberExpression::StaticMemberExpression(static_member) = &member {
-                    if let Expression::Identifier(obj) = &static_member.object {
-                        if obj.name == "console" {
-                            if !self.allowed.console {
-                                self.linter.add_error(
-                                    "allow-directives".to_string(),
-                                    "Use of 'console' requires '@allow console' directive"
-                                        .to_string(),
-                                    call.span,
-                                );
-                            } else {
-                                self.used.console = true;
-                            }
+            if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+                call.callee.as_member_expression()
+            {
+                if let Expression::Identifier(obj) = &static_member.object {
+                    if obj.name == "console" {
+                        if !self.allowed.console {
+                            self.linter.add_error(
+                                "allow-directives".to_string(),
+                                "Use of 'console' requires '@allow console' directive".to_string(),
+                                call.span,
+                            );
+                        } else {
+                            self.used.console = true;
                         }
                     }
                 }

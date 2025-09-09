@@ -473,83 +473,83 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
     // Check for forEach, eval, Object.defineProperty, and track array mutations
     fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
         // Check for forEach, Object.defineProperty, and track array mutations
-        if let Some(member) = call.callee.as_member_expression() {
-            if let MemberExpression::StaticMemberExpression(static_member) = &member {
-                let method_name = static_member.property.name.as_str();
+        if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+            call.callee.as_member_expression()
+        {
+            let method_name = static_member.property.name.as_str();
 
-                if method_name == "forEach" {
-                    self.linter.add_error(
-                        "no-foreach".to_string(),
-                        "forEach is not allowed. Use for...of loop instead".to_string(),
-                        call.span,
-                    );
-                }
+            if method_name == "forEach" {
+                self.linter.add_error(
+                    "no-foreach".to_string(),
+                    "forEach is not allowed. Use for...of loop instead".to_string(),
+                    call.span,
+                );
+            }
 
-                // Check for Object.defineProperty and Object.defineProperties
-                if let Expression::Identifier(obj) = &static_member.object {
-                    if obj.name == "Object" {
-                        if method_name == "defineProperty" {
-                            self.linter.add_error(
+            // Check for Object.defineProperty and Object.defineProperties
+            if let Expression::Identifier(obj) = &static_member.object {
+                if obj.name == "Object" {
+                    if method_name == "defineProperty" {
+                        self.linter.add_error(
                                 "no-define-property".to_string(),
                                 "Object.defineProperty is not allowed. Use direct property assignment or object literals instead".to_string(),
                                 call.span,
                             );
-                        } else if method_name == "defineProperties" {
-                            self.linter.add_error(
+                    } else if method_name == "defineProperties" {
+                        self.linter.add_error(
                                 "no-define-property".to_string(),
                                 "Object.defineProperties is not allowed. Use direct property assignment or object literals instead".to_string(),
                                 call.span,
                             );
-                        }
                     }
+                }
 
-                    // Track mutating array methods
-                    let obj_name = obj.name.to_string();
-                    if self.array_variables.contains_key(&obj_name) {
-                        const MUTATING_METHODS: &[&str] = &[
-                            "push",
-                            "pop",
-                            "shift",
-                            "unshift",
-                            "splice",
-                            "sort",
-                            "reverse",
-                            "fill",
-                            "copyWithin",
-                        ];
-                        if MUTATING_METHODS.contains(&method_name) {
-                            self.mutated_arrays.insert(obj_name);
-                        }
+                // Track mutating array methods
+                let obj_name = obj.name.to_string();
+                if self.array_variables.contains_key(&obj_name) {
+                    const MUTATING_METHODS: &[&str] = &[
+                        "push",
+                        "pop",
+                        "shift",
+                        "unshift",
+                        "splice",
+                        "sort",
+                        "reverse",
+                        "fill",
+                        "copyWithin",
+                    ];
+                    if MUTATING_METHODS.contains(&method_name) {
+                        self.mutated_arrays.insert(obj_name);
                     }
+                }
 
-                    // Check for side-effect functions (Math.random, Date.now) - always disallow
-                    if self.in_function && !self.in_default_parameter {
-                        if obj.name == "Math" && method_name == "random" {
-                            self.linter.add_error(
+                // Check for side-effect functions (Math.random, Date.now) - always disallow
+                if self.in_function && !self.in_default_parameter {
+                    if obj.name == "Math" && method_name == "random" {
+                        self.linter.add_error(
                                 "no-side-effect-functions".to_string(),
                                 "Direct use of 'Math.random()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
                                 call.span,
                             );
-                        } else if obj.name == "Date" && method_name == "now" {
-                            self.linter.add_error(
+                    } else if obj.name == "Date" && method_name == "now" {
+                        self.linter.add_error(
                                 "no-side-effect-functions".to_string(),
                                 "Direct use of 'Date.now()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
                                 call.span,
                             );
-                        }
                     }
+                }
 
-                    // Check console access
-                    if obj.name == "console" {
-                        if !self.allowed_features.console {
-                            self.linter.add_error(
-                                "allow-directives".to_string(),
-                                "Use of 'console' requires '@allow console' directive".to_string(),
-                                call.span,
-                            );
-                        } else {
-                            self.used_features.console = true;
-                        }
+                // Check console access
+                if obj.name == "console" {
+                    if !self.allowed_features.console {
+                        self.linter.add_error(
+                            "allow-directives".to_string(),
+                            "Use of 'console' requires '@allow console' directive".to_string(),
+                            call.span,
+                        );
+                    } else {
+                        self.used_features.console = true;
                     }
                 }
             }
@@ -978,13 +978,12 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                         }
                     }
                     Expression::CallExpression(call) => {
-                        if let Some(member) = call.callee.as_member_expression() {
-                            if let MemberExpression::StaticMemberExpression(static_member) = member
-                            {
-                                if let Expression::Identifier(obj) = &static_member.object {
-                                    if obj.name == "Array" {
-                                        self.array_variables.insert(var_name.clone(), decl.span);
-                                    }
+                        if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+                            call.callee.as_member_expression()
+                        {
+                            if let Expression::Identifier(obj) = &static_member.object {
+                                if obj.name == "Array" {
+                                    self.array_variables.insert(var_name.clone(), decl.span);
                                 }
                             }
                         }
@@ -1111,15 +1110,15 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                 }
 
                 // Check for unused map
-                if let Some(member) = call.callee.as_member_expression() {
-                    if let MemberExpression::StaticMemberExpression(static_member) = &member {
-                        if static_member.property.name == "map" {
-                            self.linter.add_error(
-                                "no-unused-map".to_string(),
-                                "map() return value must be used".to_string(),
-                                stmt.span,
-                            );
-                        }
+                if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+                    call.callee.as_member_expression()
+                {
+                    if static_member.property.name == "map" {
+                        self.linter.add_error(
+                            "no-unused-map".to_string(),
+                            "map() return value must be used".to_string(),
+                            stmt.span,
+                        );
                     }
                 }
             }

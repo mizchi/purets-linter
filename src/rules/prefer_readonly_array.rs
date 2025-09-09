@@ -138,18 +138,18 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
 
     fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
         // Check for mutating method calls on tracked arrays
-        if let Some(member) = call.callee.as_member_expression() {
-            if let MemberExpression::StaticMemberExpression(static_member) = member {
-                // Get the object being called on
-                if let Expression::Identifier(obj_id) = &static_member.object {
-                    let obj_name = obj_id.name.to_string();
+        if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+            call.callee.as_member_expression()
+        {
+            // Get the object being called on
+            if let Expression::Identifier(obj_id) = &static_member.object {
+                let obj_name = obj_id.name.to_string();
 
-                    // Check if this is a tracked array and a mutating method
-                    if self.array_variables.contains_key(&obj_name) {
-                        let method_name = static_member.property.name.as_str();
-                        if MUTATING_METHODS.contains(&method_name) {
-                            self.mutated_arrays.insert(obj_name);
-                        }
+                // Check if this is a tracked array and a mutating method
+                if self.array_variables.contains_key(&obj_name) {
+                    let method_name = static_member.property.name.as_str();
+                    if MUTATING_METHODS.contains(&method_name) {
+                        self.mutated_arrays.insert(obj_name);
                     }
                 }
             }

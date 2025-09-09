@@ -90,10 +90,8 @@ impl TestRunnerDetector {
         ];
 
         for dir in test_dirs {
-            if dir.exists() {
-                if self.check_directory_for_node_test(&dir) {
-                    return true;
-                }
+            if dir.exists() && self.check_directory_for_node_test(&dir) {
+                return true;
             }
         }
 
@@ -117,14 +115,13 @@ impl TestRunnerDetector {
                             if let Some(name) = path.file_name() {
                                 let name_str = name.to_string_lossy();
                                 // Check if it's a test file (Vitest pattern: .test.ts, .spec.ts)
-                                if name_str.contains(".test.")
+                                if (name_str.contains(".test.")
                                     || name_str.contains(".spec.")
                                     || name_str.contains("_test.")
-                                    || name_str.contains("_spec.")
+                                    || name_str.contains("_spec."))
+                                    && self.file_has_node_test_import(&path)
                                 {
-                                    if self.file_has_node_test_import(&path) {
-                                        return true;
-                                    }
+                                    return true;
                                 }
                             }
                         }

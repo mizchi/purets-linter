@@ -13,26 +13,25 @@ pub fn check_no_define_property(linter: &mut Linter, program: &Program) {
     impl<'a, 'b> Visit<'b> for DefinePropertyVisitor<'a, 'b> {
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
             // Check for Object.defineProperty calls
-            if let Some(member) = call.callee.as_member_expression() {
-                if let MemberExpression::StaticMemberExpression(static_member) = member {
-                    if let Expression::Identifier(obj) = &static_member.object {
-                        if obj.name == "Object" && static_member.property.name == "defineProperty" {
-                            self.linter.add_error(
+            if let Some(MemberExpression::StaticMemberExpression(static_member)) =
+                call.callee.as_member_expression()
+            {
+                if let Expression::Identifier(obj) = &static_member.object {
+                    if obj.name == "Object" && static_member.property.name == "defineProperty" {
+                        self.linter.add_error(
                                 "no-define-property".to_string(),
                                 "Object.defineProperty is not allowed. Use direct property assignment or object literals instead".to_string(),
                                 call.span,
                             );
-                        }
+                    }
 
-                        // Also check Object.defineProperties
-                        if obj.name == "Object" && static_member.property.name == "defineProperties"
-                        {
-                            self.linter.add_error(
+                    // Also check Object.defineProperties
+                    if obj.name == "Object" && static_member.property.name == "defineProperties" {
+                        self.linter.add_error(
                                 "no-define-property".to_string(),
                                 "Object.defineProperties is not allowed. Use direct property assignment or object literals instead".to_string(),
                                 call.span,
                             );
-                        }
                     }
                 }
             }

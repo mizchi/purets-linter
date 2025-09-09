@@ -70,10 +70,8 @@ pub fn check_catch_error_handling(linter: &mut Linter, program: &Program) {
                         if let Expression::Identifier(obj) = &member.object {
                             if obj.name == "Error" && member.property.name == "isError" {
                                 // Check if the argument is the error parameter
-                                if let Some(arg) = call.arguments.first() {
-                                    if let Argument::Identifier(ident) = &arg {
-                                        return ident.name == error_name;
-                                    }
+                                if let Some(Argument::Identifier(ident)) = call.arguments.first() {
+                                    return ident.name == error_name;
                                 }
                             }
                         }

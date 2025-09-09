@@ -11,61 +11,59 @@ pub fn check_export_const_type_required(linter: &mut Linter, program: &Program) 
 
     impl<'a> Visit<'a> for ExportConstChecker<'a> {
         fn visit_export_named_declaration(&mut self, decl: &ExportNamedDeclaration<'a>) {
-            if let Some(declaration) = &decl.declaration {
-                if let Declaration::VariableDeclaration(var_decl) = declaration {
-                    // Check for export let (prohibited)
-                    if var_decl.kind == VariableDeclarationKind::Let {
-                        self.linter.add_error(
-                            "no-export-let".to_string(),
-                            "Export let is not allowed. Use 'export const' with explicit type "
-                                .to_string(),
-                            var_decl.span,
-                        );
-                        return;
-                    }
+            if let Some(Declaration::VariableDeclaration(var_decl)) = &decl.declaration {
+                // Check for export let (prohibited)
+                if var_decl.kind == VariableDeclarationKind::Let {
+                    self.linter.add_error(
+                        "no-export-let".to_string(),
+                        "Export let is not allowed. Use 'export const' with explicit type "
+                            .to_string(),
+                        var_decl.span,
+                    );
+                    return;
+                }
 
-                    // Check for export const without type annotation
-                    if var_decl.kind == VariableDeclarationKind::Const {
-                        for declarator in &var_decl.declarations {
-                            // Check if it has a type annotation
-                            if declarator.id.type_annotation.is_none() {
-                                // Check if it's a function (arrow functions should have type)
-                                let needs_type = if let Some(init) = &declarator.init {
-                                    !matches!(
-                                        init,
-                                        Expression::ArrowFunctionExpression(_)
-                                            | Expression::FunctionExpression(_)
-                                    )
-                                } else {
-                                    true
+                // Check for export const without type annotation
+                if var_decl.kind == VariableDeclarationKind::Const {
+                    for declarator in &var_decl.declarations {
+                        // Check if it has a type annotation
+                        if declarator.id.type_annotation.is_none() {
+                            // Check if it's a function (arrow functions should have type)
+                            let needs_type = if let Some(init) = &declarator.init {
+                                !matches!(
+                                    init,
+                                    Expression::ArrowFunctionExpression(_)
+                                        | Expression::FunctionExpression(_)
+                                )
+                            } else {
+                                true
+                            };
+
+                            if needs_type {
+                                // Get the name for error message
+                                let var_name = match &declarator.id.kind {
+                                    BindingPatternKind::BindingIdentifier(ident) => {
+                                        ident.name.to_string()
+                                    }
+                                    BindingPatternKind::ObjectPattern(_) => {
+                                        "destructured object".to_string()
+                                    }
+                                    BindingPatternKind::ArrayPattern(_) => {
+                                        "destructured array".to_string()
+                                    }
+                                    BindingPatternKind::AssignmentPattern(_) => {
+                                        "assignment pattern".to_string()
+                                    }
                                 };
 
-                                if needs_type {
-                                    // Get the name for error message
-                                    let var_name = match &declarator.id.kind {
-                                        BindingPatternKind::BindingIdentifier(ident) => {
-                                            ident.name.to_string()
-                                        }
-                                        BindingPatternKind::ObjectPattern(_) => {
-                                            "destructured object".to_string()
-                                        }
-                                        BindingPatternKind::ArrayPattern(_) => {
-                                            "destructured array".to_string()
-                                        }
-                                        BindingPatternKind::AssignmentPattern(_) => {
-                                            "assignment pattern".to_string()
-                                        }
-                                    };
-
-                                    self.linter.add_error(
-                                        "export-const-needs-type".to_string(),
-                                        format!(
-                                            "Export const '{}' must have an explicit type ",
-                                            var_name
-                                        ),
-                                        declarator.span,
-                                    );
-                                }
+                                self.linter.add_error(
+                                    "export-const-needs-type".to_string(),
+                                    format!(
+                                        "Export const '{}' must have an explicit type ",
+                                        var_name
+                                    ),
+                                    declarator.span,
+                                );
                             }
                         }
                     }

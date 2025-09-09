@@ -21,7 +21,7 @@ pub fn check_strict_named_export(linter: &mut Linter, program: &Program) {
         .to_string();
 
     let expected_name = if filename.starts_with('_') {
-        filename[1..].to_string()
+        filename.strip_prefix('_').unwrap_or(&filename).to_string()
     } else {
         filename.clone()
     };

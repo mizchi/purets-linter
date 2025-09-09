@@ -28,12 +28,10 @@ pub fn check_jsdoc_param_match(linter: &mut Linter, program: &Program) {
 
         fn visit_variable_declaration(&mut self, decl: &VariableDeclaration<'a>) {
             for declarator in &decl.declarations {
-                if let Some(init) = &declarator.init {
-                    if let Expression::ArrowFunctionExpression(arrow) = init {
-                        if let BindingPatternKind::BindingIdentifier(ident) = &declarator.id.kind {
-                            let func_name = ident.name.as_str();
-                            self.check_jsdoc_params(func_name, &arrow.params.items, arrow.span);
-                        }
+                if let Some(Expression::ArrowFunctionExpression(arrow)) = &declarator.init {
+                    if let BindingPatternKind::BindingIdentifier(ident) = &declarator.id.kind {
+                        let func_name = ident.name.as_str();
+                        self.check_jsdoc_params(func_name, &arrow.params.items, arrow.span);
                     }
                 }
             }
@@ -143,8 +141,12 @@ pub fn check_jsdoc_param_match(linter: &mut Linter, program: &Program) {
                         let trimmed = line.trim().trim_start_matches('*').trim();
                         if trimmed.starts_with("@param") {
                             // Parse: @param {type} name - description
-                            let parts: Vec<&str> =
-                                trimmed["@param".len()..].trim().splitn(3, ' ').collect();
+                            let parts: Vec<&str> = trimmed
+                                .strip_prefix("@param")
+                                .unwrap_or("")
+                                .trim()
+                                .splitn(3, ' ')
+                                .collect();
                             if parts.len() >= 2 {
                                 // Extract type and name
                                 let type_str = parts[0].trim_matches(|c| c == '{' || c == '}');
