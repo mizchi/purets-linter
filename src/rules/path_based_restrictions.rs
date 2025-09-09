@@ -1,7 +1,7 @@
 use oxc_ast::ast::*;
 use oxc_span::Span;
 
-use crate::Linter;
+use crate::{Linter, TestRunner};
 
 /// Check path-based restrictions for TypeScript files
 /// 
@@ -254,6 +254,10 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
 
 /// Check that *_test.ts files import the function with matching name
 fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &str) {
+    // If a test runner is specified, check for appropriate imports
+    if let Some(test_runner) = linter.test_runner.clone() {
+        check_test_runner_imports(linter, program, &test_runner);
+    }
     // Extract base filename without _test.ts suffix
     let filename = file_path
         .rsplit('/')
@@ -319,6 +323,76 @@ fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &s
             Span::new(0, 0),
         );
     }
+}
+
+/// Check that test files use the correct test runner imports
+fn check_test_runner_imports(linter: &mut Linter, program: &Program, test_runner: &TestRunner) {
+    let mut found_test_runner_import = false;
+    let mut found_wrong_runner = false;
+    let mut wrong_runner_name = String::new();
+    
+    // Check all imports
+    for stmt in &program.body {
+        if let Statement::ImportDeclaration(import) = stmt {
+            let source = import.source.value.as_str();
+            
+            // Check if this import matches the specified test runner
+            if test_runner.matches_import(source) {
+                found_test_runner_import = true;
+            }
+            
+            // Check if this import matches a different test runner
+            for other_runner in [TestRunner::Vitest, TestRunner::NodeTest, TestRunner::DenoTest].iter() {
+                if other_runner != test_runner && other_runner.matches_import(source) {
+                    found_wrong_runner = true;
+                    wrong_runner_name = other_runner.to_string();
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Report errors
+    if found_wrong_runner {
+        linter.add_error(
+            "path-based-restrictions".to_string(),
+            format!("Test file should use '{}' but found imports for '{}'", test_runner, wrong_runner_name),
+            Span::new(0, 0),
+        );
+    } else if !found_test_runner_import {
+        // Check if there are any test-like function calls that suggest a test file
+        let mut has_test_code = false;
+        for stmt in &program.body {
+            if contains_test_code(stmt) {
+                has_test_code = true;
+                break;
+            }
+        }
+        
+        if has_test_code {
+            linter.add_error(
+                "path-based-restrictions".to_string(),
+                format!("Test file should import from '{}' test runner", test_runner),
+                Span::new(0, 0),
+            );
+        }
+    }
+}
+
+/// Check if a statement contains test-like code
+fn contains_test_code(stmt: &Statement) -> bool {
+    match stmt {
+        Statement::ExpressionStatement(expr_stmt) => {
+            if let Expression::CallExpression(call) = &expr_stmt.expression {
+                if let Expression::Identifier(id) = &call.callee {
+                    let name = id.name.as_str();
+                    return name == "describe" || name == "it" || name == "test" || name == "expect";
+                }
+            }
+        }
+        _ => {}
+    }
+    false
 }
 
 #[cfg(test)]

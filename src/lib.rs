@@ -9,12 +9,14 @@ pub mod comparer;
 pub mod combined_visitor;
 pub mod package_checker;
 pub mod disable_directives;
+pub mod test_runner;
 mod tsconfig_validator;
 mod package_json_validator;
 
 pub use tsconfig_validator::TsConfigValidator;
 pub use package_json_validator::PackageJsonValidator;
 pub use package_checker::check_package_json;
+pub use test_runner::TestRunner;
 
 pub struct Linter {
     pub path: PathBuf,
@@ -22,6 +24,7 @@ pub struct Linter {
     pub errors: Vec<LintError>,
     pub verbose: bool,
     disable_directives: DisableDirectives,
+    pub test_runner: Option<TestRunner>,
 }
 
 #[derive(Debug)]
@@ -41,7 +44,13 @@ impl Linter {
             errors: Vec::new(),
             verbose,
             disable_directives,
+            test_runner: None,
         }
+    }
+    
+    pub fn with_test_runner(mut self, test_runner: Option<TestRunner>) -> Self {
+        self.test_runner = test_runner;
+        self
     }
     
     pub fn check_program(&mut self, program: &oxc_ast::ast::Program) {

@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use pure_ts::{Linter, TsConfigValidator, PackageJsonValidator, comparer, check_package_json};
+use pure_ts::{Linter, TsConfigValidator, PackageJsonValidator, comparer, check_package_json, TestRunner};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -31,6 +31,9 @@ struct Args {
     
     #[arg(short = 'j', long = "jobs", help = "Number of parallel jobs (default: CPU count)")]
     jobs: Option<usize>,
+    
+    #[arg(long = "test", help = "Test runner to use (vitest, node-test, deno-test)")]
+    test: Option<String>,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -121,6 +124,22 @@ fn main() -> Result<()> {
             .unwrap_or_else(|e| eprintln!("Warning: Failed to set thread count: {}", e));
     }
     
+    // Parse test runner if specified
+    let test_runner = if let Some(test_str) = &args.test {
+        match TestRunner::from_str(test_str) {
+            Some(runner) => {
+                println!("Using test runner: {}", runner);
+                Some(runner)
+            }
+            None => {
+                eprintln!("Error: Unknown test runner '{}'. Valid options: vitest, node-test, deno-test", test_str);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        None
+    };
+    
     let start = Instant::now();
     let total_errors = Arc::new(AtomicUsize::new(0));
     let verbose = args.verbose;
@@ -129,7 +148,8 @@ fn main() -> Result<()> {
     let _results: Vec<_> = files
         .par_iter()
         .map(|file_path| {
-            match check_file(file_path, verbose) {
+            let runner = test_runner.clone();
+            match check_file_with_test_runner(file_path, verbose, runner) {
                 Ok(error_count) => {
                     if error_count > 0 {
                         total_errors.fetch_add(error_count, Ordering::Relaxed);
@@ -201,6 +221,10 @@ fn collect_files(path: &str) -> Result<Vec<PathBuf>> {
 }
 
 fn check_file(path: &Path, verbose: bool) -> Result<usize> {
+    check_file_with_test_runner(path, verbose, None)
+}
+
+fn check_file_with_test_runner(path: &Path, verbose: bool, test_runner: Option<TestRunner>) -> Result<usize> {
     let source_text = fs::read_to_string(path)?;
     let allocator = Allocator::default();
     let source_type = SourceType::from_path(path).unwrap_or(SourceType::default());
@@ -222,7 +246,8 @@ fn check_file(path: &Path, verbose: bool) -> Result<usize> {
         return Ok(error_count);
     }
     
-    let mut linter = Linter::new(path, &source_text, verbose);
+    let mut linter = Linter::new(path, &source_text, verbose)
+        .with_test_runner(test_runner);
     linter.check_program(&program);
     
     if linter.has_errors() {
