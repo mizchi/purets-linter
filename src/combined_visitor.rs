@@ -22,6 +22,8 @@ pub struct CombinedVisitor<'a> {
     array_variables: HashMap<String, oxc_span::Span>,
     mutated_arrays: HashSet<String>,
     readonly_arrays: HashSet<String>,
+    // State for no-global-process
+    imported_process_names: HashSet<String>,
 }
 
 impl<'a> CombinedVisitor<'a> {
@@ -38,12 +40,14 @@ impl<'a> CombinedVisitor<'a> {
             array_variables: HashMap::new(),
             mutated_arrays: HashSet::new(),
             readonly_arrays: HashSet::new(),
+            imported_process_names: HashSet::new(),
         }
     }
     
     pub fn check_program(&mut self, program: &'a Program<'a>) {
-        // First pass: collect exports for one-public-function rule
+        // First pass: collect exports and imports
         self.collect_exports(program);
+        self.collect_imports(program);
         
         // Visit the entire program
         self.visit_program(program);
@@ -52,6 +56,29 @@ impl<'a> CombinedVisitor<'a> {
         self.check_one_public_function();
         self.check_unused_variables();
         self.check_prefer_readonly_arrays();
+    }
+    
+    fn collect_imports(&mut self, program: &'a Program<'a>) {
+        for item in &program.body {
+            if let Statement::ImportDeclaration(import) = item {
+                // Check if importing process from node:process
+                if import.source.value == "node:process" || import.source.value == "process" {
+                    if let Some(specifiers) = &import.specifiers {
+                        for spec in specifiers {
+                            match spec {
+                                ImportDeclarationSpecifier::ImportDefaultSpecifier(default) => {
+                                    self.imported_process_names.insert(default.local.name.to_string());
+                                }
+                                ImportDeclarationSpecifier::ImportSpecifier(named) => {
+                                    self.imported_process_names.insert(named.local.name.to_string());
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     fn collect_exports(&mut self, program: &'a Program<'a>) {
@@ -305,12 +332,18 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
             }
         }
         
-        // Check for eval
+        // Check for eval and require
         if let Expression::Identifier(ident) = &call.callee {
             if ident.name == "eval" {
                 self.linter.add_error(
                     "no-eval-function".to_string(),
                     "eval() is not allowed".to_string(),
+                    call.span,
+                );
+            } else if ident.name == "require" {
+                self.linter.add_error(
+                    "no-require".to_string(),
+                    "require() is not allowed. Use ES6 import statements instead".to_string(),
                     call.span,
                 );
             }
@@ -469,9 +502,20 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         oxc_ast::visit::walk::walk_variable_declarator(self, decl);
     }
     
-    // Track variable usage
+    // Track variable usage and check for global process
     fn visit_identifier_reference(&mut self, ident: &IdentifierReference<'a>) {
-        self.used_vars.insert(ident.name.to_string());
+        let name = ident.name.to_string();
+        self.used_vars.insert(name.clone());
+        
+        // Check for global process usage (no-global-process rule)
+        if ident.name == "process" && !self.imported_process_names.contains(&name) {
+            self.linter.add_error(
+                "no-global-process".to_string(),
+                "Global 'process' is not allowed. Import it from 'node:process' instead".to_string(),
+                ident.span,
+            );
+        }
+        
         oxc_ast::visit::walk::walk_identifier_reference(self, ident);
     }
     
@@ -694,13 +738,28 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
         oxc_ast::visit::walk::walk_switch_case(self, case);
     }
     
-    // Check for as casts (no-as-cast rule)
+    // Check for as casts (no-as-cast rule) - but allow 'as const'
     fn visit_ts_as_expression(&mut self, expr: &TSAsExpression<'a>) {
-        self.linter.add_error(
-            "no-as-cast".to_string(),
-            "Type assertions with 'as' are not allowed".to_string(),
-            expr.span,
-        );
+        // Check if it's 'as const'
+        let is_const_assertion = match &expr.type_annotation {
+            TSType::TSTypeReference(type_ref) => {
+                if let TSTypeName::IdentifierReference(id) = &type_ref.type_name {
+                    id.name == "const"
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+        
+        if !is_const_assertion {
+            self.linter.add_error(
+                "no-as-cast".to_string(),
+                "Type assertions with 'as' are not allowed (except 'as const')".to_string(),
+                expr.span,
+            );
+        }
+        
         oxc_ast::visit::walk::walk_ts_as_expression(self, expr);
     }
     

@@ -35,6 +35,8 @@ pub mod prefer_readonly_array;
 pub mod no_define_property;
 pub mod no_dynamic_access;
 pub mod max_function_params;
+pub mod no_require;
+pub mod no_global_process;
 
 pub use no_classes::check_no_classes;
 pub use no_enums::check_no_enums;
@@ -72,3 +74,5 @@ pub use prefer_readonly_array::check_prefer_readonly_array;
 pub use no_define_property::check_no_define_property;
 pub use no_dynamic_access::check_no_dynamic_access;
 pub use max_function_params::check_max_function_params;
+pub use no_require::check_no_require;
+pub use no_global_process::check_no_global_process;
