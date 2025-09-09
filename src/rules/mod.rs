@@ -87,4 +87,4 @@ pub use forbidden_libraries::check_forbidden_libraries;
 pub use filename_function_match::check_filename_function_match;
 pub use export_requires_jsdoc::check_export_requires_jsdoc;
 pub use no_side_effect_functions::check_no_side_effect_functions;
-pub use allow_directives::{check_allow_directives, AllowedFeatures};
+pub use allow_directives::{check_allow_directives, AllowedFeatures, UsedFeatures};

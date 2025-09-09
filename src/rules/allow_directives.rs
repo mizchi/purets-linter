@@ -9,9 +9,14 @@ pub struct AllowedFeatures {
     pub console: bool,
     pub net: bool,
     pub dom: bool,
-    pub mutations: bool,
-    pub process: bool,
-    pub fs: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct UsedFeatures {
+    pub timers: bool,
+    pub console: bool,
+    pub net: bool,
+    pub dom: bool,
 }
 
 impl AllowedFeatures {
@@ -38,9 +43,6 @@ impl AllowedFeatures {
                             "console" => features.console = true,
                             "net" => features.net = true,
                             "dom" => features.dom = true,
-                            "mutations" => features.mutations = true,
-                            "process" => features.process = true,
-                            "fs" => features.fs = true,
                             _ => {}
                         }
                     }
@@ -52,7 +54,7 @@ impl AllowedFeatures {
     }
 }
 
-pub fn check_allow_directives(linter: &mut Linter, program: &Program) {
+pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFeatures {
     use oxc_ast::Visit;
     
     let allowed = AllowedFeatures::from_jsdoc(&linter.source_text);
@@ -60,6 +62,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) {
     struct AllowDirectiveVisitor<'a, 'b> {
         linter: &'a mut Linter,
         allowed: AllowedFeatures,
+        used: UsedFeatures,
         in_function: bool,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
@@ -87,45 +90,40 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) {
             let name = ident.name.as_str();
             
             // Check DOM access
-            if !self.allowed.dom {
-                const DOM_GLOBALS: &[&str] = &[
-                    "document", "window", "navigator", "location", 
-                    "localStorage", "sessionStorage", "history",
-                    "screen", "alert", "confirm", "prompt"
-                ];
-                
-                if DOM_GLOBALS.contains(&name) {
+            const DOM_GLOBALS: &[&str] = &[
+                "document", "window", "navigator", "location", 
+                "localStorage", "sessionStorage", "history",
+                "screen", "alert", "confirm", "prompt"
+            ];
+            
+            if DOM_GLOBALS.contains(&name) {
+                if !self.allowed.dom {
                     self.linter.add_error(
                         "allow-directives".to_string(),
                         format!("Access to '{}' requires '@allow dom' directive", name),
                         ident.span,
                     );
+                } else {
+                    self.used.dom = true;
                 }
             }
             
             // Check network access
-            if !self.allowed.net {
-                const NET_GLOBALS: &[&str] = &[
-                    "fetch", "XMLHttpRequest", "WebSocket", "EventSource",
-                    "ServiceWorker", "navigator.serviceWorker"
-                ];
-                
-                if NET_GLOBALS.contains(&name) {
+            const NET_GLOBALS: &[&str] = &[
+                "fetch", "XMLHttpRequest", "WebSocket", "EventSource",
+                "ServiceWorker"
+            ];
+            
+            if NET_GLOBALS.contains(&name) {
+                if !self.allowed.net {
                     self.linter.add_error(
                         "allow-directives".to_string(),
                         format!("Access to '{}' requires '@allow net' directive", name),
                         ident.span,
                     );
+                } else {
+                    self.used.net = true;
                 }
-            }
-            
-            // Check process access
-            if !self.allowed.process && name == "process" {
-                self.linter.add_error(
-                    "allow-directives".to_string(),
-                    "Access to 'process' requires '@allow process' directive".to_string(),
-                    ident.span,
-                );
             }
             
             oxc_ast::visit::walk::walk_identifier_reference(self, ident);
@@ -133,53 +131,40 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) {
         
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
             // Check timer functions
-            if !self.allowed.timers && self.in_function {
-                if let Expression::Identifier(ident) = &call.callee {
-                    const TIMER_FUNCTIONS: &[&str] = &[
-                        "setTimeout", "setInterval", "setImmediate",
-                        "requestAnimationFrame", "requestIdleCallback",
-                        "clearTimeout", "clearInterval", "clearImmediate",
-                        "cancelAnimationFrame", "cancelIdleCallback"
-                    ];
-                    
-                    if TIMER_FUNCTIONS.contains(&ident.name.as_str()) {
+            if let Expression::Identifier(ident) = &call.callee {
+                const TIMER_FUNCTIONS: &[&str] = &[
+                    "setTimeout", "setInterval", "setImmediate",
+                    "requestAnimationFrame", "requestIdleCallback",
+                    "clearTimeout", "clearInterval", "clearImmediate",
+                    "cancelAnimationFrame", "cancelIdleCallback"
+                ];
+                
+                if TIMER_FUNCTIONS.contains(&ident.name.as_str()) {
+                    if !self.allowed.timers {
                         self.linter.add_error(
                             "allow-directives".to_string(),
                             format!("Use of '{}' requires '@allow timers' directive", ident.name),
                             call.span,
                         );
+                    } else {
+                        self.used.timers = true;
                     }
                 }
             }
             
             // Check console access
-            if !self.allowed.console {
-                if let Some(member) = call.callee.as_member_expression() {
-                    if let MemberExpression::StaticMemberExpression(static_member) = &member {
-                        if let Expression::Identifier(obj) = &static_member.object {
-                            if obj.name == "console" {
+            if let Some(member) = call.callee.as_member_expression() {
+                if let MemberExpression::StaticMemberExpression(static_member) = &member {
+                    if let Expression::Identifier(obj) = &static_member.object {
+                        if obj.name == "console" {
+                            if !self.allowed.console {
                                 self.linter.add_error(
                                     "allow-directives".to_string(),
                                     "Use of 'console' requires '@allow console' directive".to_string(),
                                     call.span,
                                 );
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Check fs module access  
-            if !self.allowed.fs {
-                if let Some(member) = call.callee.as_member_expression() {
-                    if let MemberExpression::StaticMemberExpression(static_member) = &member {
-                        if let Expression::Identifier(obj) = &static_member.object {
-                            if obj.name == "fs" || obj.name == "fsPromises" {
-                                self.linter.add_error(
-                                    "allow-directives".to_string(),
-                                    "Use of file system requires '@allow fs' directive".to_string(),
-                                    call.span,
-                                );
+                            } else {
+                                self.used.console = true;
                             }
                         }
                     }
@@ -235,12 +220,45 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) {
     
     let mut visitor = AllowDirectiveVisitor {
         linter,
-        allowed,
+        allowed: allowed.clone(),
+        used: UsedFeatures::default(),
         in_function: false,
         _phantom: std::marker::PhantomData,
     };
     
     visitor.visit_program(program);
+    
+    // Check for unused @allow directives
+    if allowed.dom && !visitor.used.dom {
+        visitor.linter.add_error(
+            "allow-directives".to_string(),
+            "Unused '@allow dom' directive".to_string(),
+            oxc_span::Span::new(0, 0),
+        );
+    }
+    if allowed.net && !visitor.used.net {
+        visitor.linter.add_error(
+            "allow-directives".to_string(),
+            "Unused '@allow net' directive".to_string(),
+            oxc_span::Span::new(0, 0),
+        );
+    }
+    if allowed.timers && !visitor.used.timers {
+        visitor.linter.add_error(
+            "allow-directives".to_string(),
+            "Unused '@allow timers' directive".to_string(),
+            oxc_span::Span::new(0, 0),
+        );
+    }
+    if allowed.console && !visitor.used.console {
+        visitor.linter.add_error(
+            "allow-directives".to_string(),
+            "Unused '@allow console' directive".to_string(),
+            oxc_span::Span::new(0, 0),
+        );
+    }
+    
+    visitor.used
 }
 
 #[cfg(test)]
