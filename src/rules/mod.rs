@@ -43,6 +43,7 @@ pub mod filename_function_match;
 pub mod export_requires_jsdoc;
 pub mod no_side_effect_functions;
 pub mod allow_directives;
+pub mod path_based_restrictions;
 
 pub use no_classes::check_no_classes;
 pub use no_enums::check_no_enums;
@@ -88,3 +89,4 @@ pub use filename_function_match::check_filename_function_match;
 pub use export_requires_jsdoc::check_export_requires_jsdoc;
 pub use no_side_effect_functions::check_no_side_effect_functions;
 pub use allow_directives::{check_allow_directives, AllowedFeatures, UsedFeatures};
+pub use path_based_restrictions::check_path_based_restrictions;

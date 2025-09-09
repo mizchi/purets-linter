@@ -60,6 +60,10 @@ impl<'a> CombinedVisitor<'a> {
         self.collect_exports(program);
         self.collect_imports(program);
         
+        // Check path-based restrictions (io/pure/types conventions)
+        let file_path = self.linter.path.to_str().unwrap_or("").to_string();
+        crate::rules::check_path_based_restrictions(self.linter, program, &file_path);
+        
         // Check filename-function match
         self.check_filename_function_match(program);
         

@@ -1,6 +1,6 @@
 /**
  * @allow console
  */
-export function main() {
+export async function main(): Promise<void> {
   console.log("This is an example IO main function.");
 }
