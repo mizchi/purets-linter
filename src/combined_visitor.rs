@@ -24,6 +24,8 @@ pub struct CombinedVisitor<'a> {
     readonly_arrays: HashSet<String>,
     // State for no-global-process
     imported_process_names: HashSet<String>,
+    // State for no-side-effect-functions
+    in_default_parameter: bool,
 }
 
 impl<'a> CombinedVisitor<'a> {
@@ -41,6 +43,7 @@ impl<'a> CombinedVisitor<'a> {
             mutated_arrays: HashSet::new(),
             readonly_arrays: HashSet::new(),
             imported_process_names: HashSet::new(),
+            in_default_parameter: false,
         }
     }
     
@@ -48,6 +51,12 @@ impl<'a> CombinedVisitor<'a> {
         // First pass: collect exports and imports
         self.collect_exports(program);
         self.collect_imports(program);
+        
+        // Check filename-function match
+        self.check_filename_function_match(program);
+        
+        // Check JSDoc for exports
+        self.check_export_jsdoc(program);
         
         // Visit the entire program
         self.visit_program(program);
@@ -213,6 +222,127 @@ impl<'a> CombinedVisitor<'a> {
         }
     }
     
+    fn check_filename_function_match(&mut self, program: &'a Program<'a>) {
+        let filename = self.linter.path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        
+        if filename == "index" || filename.ends_with(".test") || filename.ends_with(".spec") {
+            return;
+        }
+        
+        let mut found_matching_export = false;
+        
+        for item in &program.body {
+            match item {
+                Statement::ExportDefaultDeclaration(export) => {
+                    match &export.declaration {
+                        ExportDefaultDeclarationKind::FunctionDeclaration(func) => {
+                            if let Some(id) = &func.id {
+                                if id.name.as_str() == filename {
+                                    found_matching_export = true;
+                                } else {
+                                    self.linter.add_error(
+                                        "filename-function-match".to_string(),
+                                        format!(
+                                            "Exported function name '{}' must match filename '{}'",
+                                            id.name, filename
+                                        ),
+                                        export.span,
+                                    );
+                                }
+                            }
+                        }
+                        ExportDefaultDeclarationKind::Identifier(ident) => {
+                            if ident.name.as_str() == filename {
+                                found_matching_export = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Statement::ExportNamedDeclaration(export) => {
+                    if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
+                        if let Some(id) = &func.id {
+                            if id.name.as_str() == filename {
+                                found_matching_export = true;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        
+        if !found_matching_export && !filename.is_empty() {
+            let has_exports = program.body.iter().any(|stmt| {
+                matches!(stmt, Statement::ExportDefaultDeclaration(_) | 
+                              Statement::ExportNamedDeclaration(_))
+            });
+            
+            if has_exports {
+                self.linter.add_error(
+                    "filename-function-match".to_string(),
+                    format!("File '{}' must export a function with the same name", filename),
+                    oxc_span::Span::new(0, 0),
+                );
+            }
+        }
+    }
+    
+    fn check_export_jsdoc(&mut self, program: &'a Program<'a>) {
+        let source_text = self.linter.source_text.clone();
+        
+        for item in &program.body {
+            match item {
+                Statement::ExportDefaultDeclaration(export) => {
+                    if let ExportDefaultDeclarationKind::FunctionDeclaration(func) = &export.declaration {
+                        if !self.has_jsdoc_before(export.span, &source_text) {
+                            let name = func.id.as_ref()
+                                .map(|id| id.name.as_str())
+                                .unwrap_or("anonymous");
+                            self.linter.add_error(
+                                "export-requires-jsdoc".to_string(),
+                                format!("Exported function '{}' must have a JSDoc comment", name),
+                                export.span,
+                            );
+                        }
+                    }
+                }
+                Statement::ExportNamedDeclaration(export) => {
+                    if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
+                        if !self.has_jsdoc_before(export.span, &source_text) {
+                            let name = func.id.as_ref()
+                                .map(|id| id.name.as_str())
+                                .unwrap_or("anonymous");
+                            self.linter.add_error(
+                                "export-requires-jsdoc".to_string(),
+                                format!("Exported function '{}' must have a JSDoc comment", name),
+                                export.span,
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    
+    fn has_jsdoc_before(&self, span: oxc_span::Span, source_text: &str) -> bool {
+        let text_before = &source_text[..span.start as usize];
+        let trimmed = text_before.trim_end();
+        trimmed.ends_with("*/") && {
+            if let Some(_comment_start) = trimmed.rfind("/**") {
+                let between = &source_text[trimmed.len()..span.start as usize];
+                between.trim().is_empty()
+            } else {
+                false
+            }
+        }
+    }
+    
     fn is_array_type(&self, type_ann: &TSTypeAnnotation) -> bool {
         match &type_ann.type_annotation {
             TSType::TSArrayType(_) => true,
@@ -242,6 +372,17 @@ impl<'a> CombinedVisitor<'a> {
 }
 
 impl<'a> Visit<'a> for CombinedVisitor<'a> {
+    // Track function and parameter state for side-effect checks
+    fn visit_formal_parameter(&mut self, param: &FormalParameter<'a>) {
+        // Check if we're in a default parameter
+        if param.pattern.optional {
+            self.in_default_parameter = true;
+        }
+        
+        oxc_ast::visit::walk::walk_formal_parameter(self, param);
+        
+        self.in_default_parameter = false;
+    }
     // Check for classes (no-classes rule)
     fn visit_class(&mut self, class: &Class<'a>) {
         self.linter.add_error(
@@ -328,6 +469,23 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                             self.mutated_arrays.insert(obj_name);
                         }
                     }
+                    
+                    // Check for side-effect functions (Math.random, Date.now)
+                    if self.in_function && !self.in_default_parameter {
+                        if (obj.name == "Math" && method_name == "random") {
+                            self.linter.add_error(
+                                "no-side-effect-functions".to_string(),
+                                "Direct use of 'Math.random()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
+                                call.span,
+                            );
+                        } else if (obj.name == "Date" && method_name == "now") {
+                            self.linter.add_error(
+                                "no-side-effect-functions".to_string(),
+                                "Direct use of 'Date.now()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
+                                call.span,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -380,10 +538,43 @@ impl<'a> Visit<'a> for CombinedVisitor<'a> {
                         }
                     }
                 }
+            } else if self.in_function && !self.in_default_parameter {
+                // Check for global side-effect functions (setTimeout, setInterval, etc.)
+                const SIDE_EFFECT_GLOBAL_FUNCTIONS: &[&str] = &[
+                    "setTimeout", "setInterval", "setImmediate",
+                    "requestAnimationFrame", "requestIdleCallback",
+                ];
+                
+                if SIDE_EFFECT_GLOBAL_FUNCTIONS.contains(&ident.name.as_str()) {
+                    self.linter.add_error(
+                        "no-side-effect-functions".to_string(),
+                        format!(
+                            "Direct use of '{}()' is not allowed in functions. Pass it as a parameter or use a default parameter instead",
+                            ident.name
+                        ),
+                        call.span,
+                    );
+                }
             }
         }
         
         oxc_ast::visit::walk::walk_call_expression(self, call);
+    }
+    
+    // Check for new Date() side effect
+    fn visit_new_expression(&mut self, new_expr: &NewExpression<'a>) {
+        if self.in_function && !self.in_default_parameter {
+            if let Expression::Identifier(ident) = &new_expr.callee {
+                if ident.name == "Date" {
+                    self.linter.add_error(
+                        "no-side-effect-functions".to_string(),
+                        "Direct use of 'new Date()' is not allowed in functions. Pass it as a parameter or use a default parameter instead".to_string(),
+                        new_expr.span,
+                    );
+                }
+            }
+        }
+        oxc_ast::visit::walk::walk_new_expression(self, new_expr);
     }
     
     // Check for do-while loops (no-do-while rule)

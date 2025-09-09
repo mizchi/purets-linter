@@ -1,6 +1,7 @@
 /**
  * @allow timers
  * @allow console
- * @allow fetch
+ * @allow net
+ * @allow dom
  **/
 export function x() {}
