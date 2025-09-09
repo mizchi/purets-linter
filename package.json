@@ -2,21 +2,5 @@
   "name": "pure-ts",
   "version": "0.1.0",
   "type": "module",
-  "description": "TypeScript pure function subset linter",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-    "typescript",
-    "linter",
-    "pure-functions"
-  ],
-  "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "neverthrow": "^8.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^24.3.1"
-  }
+  "dependencies": {}
 }

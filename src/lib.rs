@@ -6,11 +6,13 @@ use std::path::{Path, PathBuf};
 pub mod rules;
 pub mod comparer;
 pub mod combined_visitor;
+pub mod package_checker;
 mod tsconfig_validator;
 mod package_json_validator;
 
 pub use tsconfig_validator::TsConfigValidator;
 pub use package_json_validator::PackageJsonValidator;
+pub use package_checker::check_package_json;
 
 pub struct Linter {
     pub path: PathBuf,

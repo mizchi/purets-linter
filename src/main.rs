@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use pure_ts::{Linter, TsConfigValidator, PackageJsonValidator, comparer};
+use pure_ts::{Linter, TsConfigValidator, PackageJsonValidator, comparer, check_package_json};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -90,6 +90,21 @@ fn main() -> Result<()> {
         return Ok(());
     }
     
+    // Check package.json for forbidden dependencies
+    let project_path = if Path::new(&path).is_file() {
+        Path::new(&path).parent().unwrap_or(Path::new("."))
+    } else {
+        Path::new(&path)
+    };
+    
+    let package_errors = check_package_json(project_path);
+    if !package_errors.is_empty() {
+        eprintln!("{}", "Package.json dependency errors:".red().bold());
+        for error in &package_errors {
+            eprintln!("  {}", error.red());
+        }
+    }
+    
     let files = collect_files(&path)?;
     let file_count = files.len();
     
@@ -131,7 +146,8 @@ fn main() -> Result<()> {
         .collect();
     
     let duration = start.elapsed();
-    let total_errors = total_errors.load(Ordering::Relaxed);
+    let file_errors = total_errors.load(Ordering::Relaxed);
+    let total_errors = file_errors + package_errors.len();
     let has_errors = total_errors > 0;
     
     if has_errors {
