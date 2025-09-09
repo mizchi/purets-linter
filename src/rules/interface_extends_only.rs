@@ -1,5 +1,5 @@
 use oxc::ast::ast::*;
-use oxc::ast_visit::{Visit, walk};
+use oxc::ast_visit::{walk, Visit};
 
 use crate::Linter;
 
@@ -7,7 +7,7 @@ pub fn check_interface_extends_only(linter: &mut Linter, program: &Program) {
     struct InterfaceChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for InterfaceChecker<'a> {
         fn visit_ts_interface_declaration(&mut self, decl: &TSInterfaceDeclaration<'a>) {
             // Check if interface has extends clause
@@ -24,7 +24,7 @@ pub fn check_interface_extends_only(linter: &mut Linter, program: &Program) {
             walk::walk_ts_interface_declaration(self, decl);
         }
     }
-    
+
     let mut checker = InterfaceChecker { linter };
     checker.visit_program(program);
 }
@@ -42,10 +42,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_interface_extends_only(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 
@@ -57,7 +57,7 @@ mod tests {
                 name: string;
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("without extends is not allowed"));
@@ -74,7 +74,7 @@ mod tests {
                 permissions: string[];
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 1); // User interface doesn't extend anything
         assert!(errors[0].contains("Interface 'User' without extends"));
@@ -89,11 +89,15 @@ mod tests {
                 value: number;
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 2); // A and B don't extend anything
-        assert!(errors.iter().any(|e| e.contains("Interface 'A' without extends")));
-        assert!(errors.iter().any(|e| e.contains("Interface 'B' without extends")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("Interface 'A' without extends")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("Interface 'B' without extends")));
     }
 
     #[test]
@@ -104,7 +108,7 @@ mod tests {
                 name: string;
             };
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -115,7 +119,7 @@ mod tests {
             type Base = { id: string };
             type Extended = Base & { name: string };
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }

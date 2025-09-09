@@ -4,19 +4,15 @@ use oxc::span::Span;
 use crate::{Linter, TestRunner};
 
 /// Check path-based restrictions for TypeScript files
-/// 
+///
 /// Rules:
 /// - io/**/*.ts: Only async functions are allowed
 /// - pure/**/*.ts: Pure functions only, export function name must match filename
 /// - types/**/*.ts: Only one type export allowed, must match filename
 /// - *.test.ts or *_test.ts: Must import function with same name (minus test suffix)
-pub fn check_path_based_restrictions(
-    linter: &mut Linter,
-    program: &Program,
-    file_path: &str,
-) {
+pub fn check_path_based_restrictions(linter: &mut Linter, program: &Program, file_path: &str) {
     let normalized_path = file_path.replace('\\', "/");
-    
+
     // Check test files first (they can be in any directory)
     if normalized_path.ends_with("_test.ts") || normalized_path.ends_with(".test.ts") {
         // Default to vitest if no test runner specified
@@ -26,17 +22,17 @@ pub fn check_path_based_restrictions(
         check_test_file_imports(linter, program, &normalized_path);
         return; // Test files don't need to follow other path restrictions
     }
-    
+
     // Check index.ts - only re-exports allowed
     if normalized_path.ends_with("/index.ts") {
         check_index_reexports_only(linter, program);
     }
-    
+
     // Check main.ts - main() call allowed at top level
     if normalized_path.ends_with("/main.ts") {
         check_main_file(linter, program);
     }
-    
+
     // Check io/**/*.ts - async functions are optional (not required)
     if normalized_path.contains("/io/") && normalized_path.ends_with(".ts") {
         // Check io/errors/*.ts - custom error classes allowed
@@ -45,12 +41,12 @@ pub fn check_path_based_restrictions(
         }
         // No longer enforcing async-only, just allow both sync and async
     }
-    
+
     // Check pure/**/*.ts - pure functions with filename match
     if normalized_path.contains("/pure/") && normalized_path.ends_with(".ts") {
         check_pure_functions(linter, program, &normalized_path);
     }
-    
+
     // Check types/**/*.ts - single type export matching filename
     if normalized_path.contains("/types/") && normalized_path.ends_with(".ts") {
         check_type_definitions(linter, program, &normalized_path);
@@ -66,7 +62,8 @@ fn check_index_reexports_only(linter: &mut Linter, program: &Program) {
                 if export.source.is_none() && export.declaration.is_some() {
                     linter.add_error(
                         "path-based-restrictions".to_string(),
-                        "index.ts files can only contain re-exports, not direct exports".to_string(),
+                        "index.ts files can only contain re-exports, not direct exports"
+                            .to_string(),
                         export.span,
                     );
                 }
@@ -125,19 +122,19 @@ fn check_error_class_definitions(linter: &mut Linter, program: &Program, file_pa
         .next()
         .unwrap_or("")
         .trim_end_matches(".ts");
-    
+
     let mut found_matching_class = false;
-    
+
     for stmt in &program.body {
         if let Statement::ExportNamedDeclaration(export) = stmt {
             if let Some(Declaration::ClassDeclaration(class)) = &export.declaration {
                 if let Some(id) = &class.id {
                     let class_name = id.name.as_str();
-                    
+
                     // Check if class name matches filename
                     if class_name == filename {
                         found_matching_class = true;
-                        
+
                         // Check if it extends Error
                         if let Some(super_class) = &class.super_class {
                             if let Expression::Identifier(super_id) = super_class {
@@ -167,11 +164,14 @@ fn check_error_class_definitions(linter: &mut Linter, program: &Program, file_pa
             }
         }
     }
-    
+
     if !found_matching_class {
         linter.add_error(
             "path-based-restrictions".to_string(),
-            format!("io/errors/{}.ts must export error class '{}' extending Error", filename, filename),
+            format!(
+                "io/errors/{}.ts must export error class '{}' extending Error",
+                filename, filename
+            ),
             Span::new(0, 0),
         );
     }
@@ -185,10 +185,10 @@ fn check_pure_functions(linter: &mut Linter, program: &Program, file_path: &str)
         .next()
         .unwrap_or("")
         .trim_end_matches(".ts");
-    
+
     let mut found_matching_export = false;
     let mut export_count = 0;
-    
+
     // First, check that pure files don't import from io
     for stmt in &program.body {
         if let Statement::ImportDeclaration(import) = stmt {
@@ -202,13 +202,13 @@ fn check_pure_functions(linter: &mut Linter, program: &Program, file_path: &str)
             }
         }
     }
-    
+
     for stmt in &program.body {
         match stmt {
             Statement::ExportNamedDeclaration(export) => {
                 if let Some(Declaration::FunctionDeclaration(func)) = &export.declaration {
                     export_count += 1;
-                    
+
                     // Check if function is async (not allowed in pure)
                     if func.r#async {
                         linter.add_error(
@@ -217,7 +217,7 @@ fn check_pure_functions(linter: &mut Linter, program: &Program, file_path: &str)
                             func.span,
                         );
                     }
-                    
+
                     // Check if function name matches filename
                     if let Some(id) = &func.id {
                         if id.name.as_str() == filename {
@@ -239,12 +239,15 @@ fn check_pure_functions(linter: &mut Linter, program: &Program, file_path: &str)
             _ => {}
         }
     }
-    
+
     // Check if we found a function matching the filename
     if export_count > 0 && !found_matching_export {
         linter.add_error(
             "path-based-restrictions".to_string(),
-            format!("pure/**/*.ts must export a function named '{}' matching the filename", filename),
+            format!(
+                "pure/**/*.ts must export a function named '{}' matching the filename",
+                filename
+            ),
             Span::new(0, 0),
         );
     }
@@ -258,10 +261,10 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
         .next()
         .unwrap_or("")
         .trim_end_matches(".ts");
-    
+
     let mut type_exports = Vec::new();
     let mut found_matching_type = false;
-    
+
     for stmt in &program.body {
         if let Statement::ExportNamedDeclaration(export) = stmt {
             // Check for type alias exports
@@ -272,7 +275,7 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
                     found_matching_type = true;
                 }
             }
-            
+
             // Check for interface exports
             if let Some(Declaration::TSInterfaceDeclaration(interface)) = &export.declaration {
                 let name = interface.id.name.as_str();
@@ -281,7 +284,7 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
                     found_matching_type = true;
                 }
             }
-            
+
             // Check for enum exports (should be discouraged in types)
             if let Some(Declaration::TSEnumDeclaration(enum_decl)) = &export.declaration {
                 linter.add_error(
@@ -290,28 +293,31 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
                     enum_decl.span,
                 );
             }
-            
+
             // Check for function/class exports (not allowed in types)
             if let Some(decl) = &export.declaration {
                 match decl {
                     Declaration::FunctionDeclaration(func) => {
                         linter.add_error(
                             "path-based-restrictions".to_string(),
-                            "types/**/*.ts should only export type definitions, not functions".to_string(),
+                            "types/**/*.ts should only export type definitions, not functions"
+                                .to_string(),
                             func.span,
                         );
                     }
                     Declaration::ClassDeclaration(class) => {
                         linter.add_error(
                             "path-based-restrictions".to_string(),
-                            "types/**/*.ts should only export type definitions, not classes".to_string(),
+                            "types/**/*.ts should only export type definitions, not classes"
+                                .to_string(),
                             class.span,
                         );
                     }
                     Declaration::VariableDeclaration(var) => {
                         linter.add_error(
                             "path-based-restrictions".to_string(),
-                            "types/**/*.ts should only export type definitions, not variables".to_string(),
+                            "types/**/*.ts should only export type definitions, not variables"
+                                .to_string(),
                             var.span,
                         );
                     }
@@ -320,7 +326,7 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
             }
         }
     }
-    
+
     // Check if we have exactly one type export
     if type_exports.len() > 1 {
         for (name, span) in &type_exports {
@@ -335,7 +341,10 @@ fn check_type_definitions(linter: &mut Linter, program: &Program, file_path: &st
     } else if type_exports.len() == 1 && !found_matching_type {
         linter.add_error(
             "path-based-restrictions".to_string(),
-            format!("Type export must be named '{}' to match the filename", filename),
+            format!(
+                "Type export must be named '{}' to match the filename",
+                filename
+            ),
             type_exports[0].1,
         );
     }
@@ -348,11 +357,8 @@ fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &s
         check_test_runner_imports(linter, program, &test_runner);
     }
     // Extract base filename without test suffix
-    let filename = file_path
-        .rsplit('/')
-        .next()
-        .unwrap_or("");
-    
+    let filename = file_path.rsplit('/').next().unwrap_or("");
+
     // Remove test suffix (.test.ts or _test.ts)
     let filename = if filename.ends_with(".test.ts") {
         filename.trim_end_matches(".test.ts")
@@ -361,19 +367,19 @@ fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &s
     } else {
         filename
     };
-    
+
     if filename.is_empty() {
         return;
     }
-    
+
     let mut found_matching_import = false;
     let mut has_imports = false;
-    
+
     // Check import statements
     for stmt in &program.body {
         if let Statement::ImportDeclaration(import) = stmt {
             has_imports = true;
-            
+
             // Check if any specifier imports the expected function name
             if let Some(specifiers) = &import.specifiers {
                 for specifier in specifiers {
@@ -388,7 +394,9 @@ fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &s
                         ImportDeclarationSpecifier::ImportDefaultSpecifier(_) => {
                             // For default imports, check if the source matches
                             let source = import.source.value.as_str();
-                            if source.contains(filename) || source.ends_with(&format!("/{}.ts", filename)) {
+                            if source.contains(filename)
+                                || source.ends_with(&format!("/{}.ts", filename))
+                            {
                                 found_matching_import = true;
                                 break;
                             }
@@ -397,26 +405,31 @@ fn check_test_file_imports(linter: &mut Linter, program: &Program, file_path: &s
                     }
                 }
             }
-            
+
             if found_matching_import {
                 break;
             }
         }
     }
-    
+
     // Report error if the matching import was not found
     if has_imports && !found_matching_import {
         linter.add_error(
             "path-based-restrictions".to_string(),
-            format!("Test file '{}' must import function '{}' from the module being tested", 
-                    file_path.rsplit('/').next().unwrap_or(""), filename),
+            format!(
+                "Test file '{}' must import function '{}' from the module being tested",
+                file_path.rsplit('/').next().unwrap_or(""),
+                filename
+            ),
             Span::new(0, 0),
         );
     } else if !has_imports {
         linter.add_error(
             "path-based-restrictions".to_string(),
-            format!("Test file '{}' must have at least one import statement", 
-                    file_path.rsplit('/').next().unwrap_or("")),
+            format!(
+                "Test file '{}' must have at least one import statement",
+                file_path.rsplit('/').next().unwrap_or("")
+            ),
             Span::new(0, 0),
         );
     }
@@ -427,19 +440,25 @@ fn check_test_runner_imports(linter: &mut Linter, program: &Program, test_runner
     let mut found_test_runner_import = false;
     let mut found_wrong_runner = false;
     let mut wrong_runner_name = String::new();
-    
+
     // Check all imports
     for stmt in &program.body {
         if let Statement::ImportDeclaration(import) = stmt {
             let source = import.source.value.as_str();
-            
+
             // Check if this import matches the specified test runner
             if test_runner.matches_import(source) {
                 found_test_runner_import = true;
             }
-            
+
             // Check if this import matches a different test runner
-            for other_runner in [TestRunner::Vitest, TestRunner::NodeTest, TestRunner::DenoTest].iter() {
+            for other_runner in [
+                TestRunner::Vitest,
+                TestRunner::NodeTest,
+                TestRunner::DenoTest,
+            ]
+            .iter()
+            {
                 if other_runner != test_runner && other_runner.matches_import(source) {
                     found_wrong_runner = true;
                     wrong_runner_name = other_runner.to_string();
@@ -448,12 +467,15 @@ fn check_test_runner_imports(linter: &mut Linter, program: &Program, test_runner
             }
         }
     }
-    
+
     // Report errors
     if found_wrong_runner {
         linter.add_error(
             "path-based-restrictions".to_string(),
-            format!("Test file should use '{}' but found imports for '{}'", test_runner, wrong_runner_name),
+            format!(
+                "Test file should use '{}' but found imports for '{}'",
+                test_runner, wrong_runner_name
+            ),
             Span::new(0, 0),
         );
     } else if !found_test_runner_import {
@@ -465,7 +487,7 @@ fn check_test_runner_imports(linter: &mut Linter, program: &Program, test_runner
                 break;
             }
         }
-        
+
         if has_test_code {
             linter.add_error(
                 "path-based-restrictions".to_string(),
@@ -501,15 +523,11 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::from_path(file_path).unwrap();
         let parser_ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new(file_path), source, false);
         check_path_based_restrictions(&mut linter, &parser_ret.program, file_path);
-        
-        linter
-            .errors
-            .into_iter()
-            .map(|e| e.message)
-            .collect()
+
+        linter.errors.into_iter().map(|e| e.message).collect()
     }
 
     #[test]
@@ -626,7 +644,9 @@ mod tests {
         "#;
         let errors = parse_and_check(source, "src/add.test.ts");
         assert_eq!(errors.len(), 2);
-        assert!(errors.iter().any(|e| e.contains("must import function 'add'")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("must import function 'add'")));
 
         // Test file with no imports should error
         let source = r#"
@@ -636,7 +656,10 @@ mod tests {
         "#;
         let errors = parse_and_check(source, "src/add.test.ts");
         assert_eq!(errors.len(), 2);
-        assert!(errors.iter().any(|e| e.contains("must have at least one import") || e.contains("must import from 'vitest'")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("must have at least one import")
+                || e.contains("must import from 'vitest'")));
 
         // Test file with matching import should pass
         let source = r#"

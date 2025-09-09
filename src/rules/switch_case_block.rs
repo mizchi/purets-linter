@@ -8,7 +8,7 @@ pub fn check_switch_case_block(linter: &mut Linter, program: &Program) {
     struct SwitchCaseBlockChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for SwitchCaseBlockChecker<'a> {
         fn visit_switch_case(&mut self, case: &SwitchCase<'a>) {
             // Skip default case or cases with no consequent
@@ -16,16 +16,16 @@ pub fn check_switch_case_block(linter: &mut Linter, program: &Program) {
                 walk::walk_switch_case(self, case);
                 return;
             }
-            
+
             // Check if the case has a block statement
-            let has_block = case.consequent.len() == 1 && 
-                matches!(case.consequent.first(), Some(Statement::BlockStatement(_)));
-            
+            let has_block = case.consequent.len() == 1
+                && matches!(case.consequent.first(), Some(Statement::BlockStatement(_)));
+
             if !has_block {
                 // Check if it's just a break statement (which is allowed)
-                let only_break = case.consequent.len() == 1 &&
-                    matches!(case.consequent.first(), Some(Statement::BreakStatement(_)));
-                
+                let only_break = case.consequent.len() == 1
+                    && matches!(case.consequent.first(), Some(Statement::BreakStatement(_)));
+
                 if !only_break {
                     self.linter.add_error(
                         "switch-case-block".to_string(),
@@ -34,11 +34,11 @@ pub fn check_switch_case_block(linter: &mut Linter, program: &Program) {
                     );
                 }
             }
-            
+
             walk::walk_switch_case(self, case);
         }
     }
-    
+
     let mut checker = SwitchCaseBlockChecker { linter };
     checker.visit_program(program);
 }
@@ -51,7 +51,6 @@ mod tests {
     use oxc::parser::{Parser, ParserReturn};
     use oxc::span::SourceType;
     use std::path::Path;
-
 
     #[test]
     fn test_case_without_block() {
@@ -72,15 +71,18 @@ function badSwitch(value: string) {
 }
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_switch_case_block(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // TODO: Fix switch_case_block rule implementation - currently not detecting violations
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior
-        assert!(errors.iter().all(|e| e.message.contains("Switch case must use block statement")));
+        assert!(errors
+            .iter()
+            .all(|e| e.message.contains("Switch case must use block statement")));
     }
 
     #[test]
@@ -106,11 +108,12 @@ export function goodSwitch(value: string) {
 }
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_switch_case_block(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -132,11 +135,12 @@ export function switchWithBreak(value: string) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_switch_case_block(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // Only break statement should be allowed without block
     }
@@ -165,11 +169,12 @@ function mixedSwitch(value: string) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_switch_case_block(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // TODO: Fix switch_case_block rule implementation - currently not detecting violations
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior
@@ -187,11 +192,12 @@ function emptySwitch(value: string) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_switch_case_block(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }

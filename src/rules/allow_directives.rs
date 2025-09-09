@@ -23,12 +23,12 @@ pub struct UsedFeatures {
 impl AllowedFeatures {
     pub fn from_jsdoc(source_text: &str) -> Self {
         let mut features = Self::default();
-        
+
         // Find the first JSDoc comment
         if let Some(jsdoc_start) = source_text.find("/**") {
             if let Some(jsdoc_end) = source_text[jsdoc_start..].find("*/") {
                 let jsdoc = &source_text[jsdoc_start..jsdoc_start + jsdoc_end + 2];
-                
+
                 // Parse @allow directives
                 for line in jsdoc.lines() {
                     let trimmed = line.trim();
@@ -38,7 +38,7 @@ impl AllowedFeatures {
                             .trim()
                             .trim_start_matches("@allow")
                             .trim();
-                        
+
                         match allow_text {
                             "timers" => features.timers = true,
                             "console" => features.console = true,
@@ -51,16 +51,16 @@ impl AllowedFeatures {
                 }
             }
         }
-        
+
         features
     }
 }
 
 pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFeatures {
     use oxc::ast_visit::Visit;
-    
+
     let allowed = AllowedFeatures::from_jsdoc(&linter.source_text);
-    
+
     struct AllowDirectiveVisitor<'a, 'b> {
         linter: &'a mut Linter,
         allowed: AllowedFeatures,
@@ -68,36 +68,48 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
         in_function: bool,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
-    
+
     impl<'a, 'b> Visit<'b> for AllowDirectiveVisitor<'a, 'b> {
         fn visit_function(&mut self, func: &Function<'b>, _: oxc::syntax::scope::ScopeFlags) {
             let was_in_function = self.in_function;
             self.in_function = true;
-            
-            oxc::ast_visit::walk::walk_function(self, func, oxc::syntax::scope::ScopeFlags::empty());
-            
+
+            oxc::ast_visit::walk::walk_function(
+                self,
+                func,
+                oxc::syntax::scope::ScopeFlags::empty(),
+            );
+
             self.in_function = was_in_function;
         }
-        
+
         fn visit_arrow_function_expression(&mut self, arrow: &ArrowFunctionExpression<'b>) {
             let was_in_function = self.in_function;
             self.in_function = true;
-            
+
             oxc::ast_visit::walk::walk_arrow_function_expression(self, arrow);
-            
+
             self.in_function = was_in_function;
         }
-        
+
         fn visit_identifier_reference(&mut self, ident: &IdentifierReference<'b>) {
             let name = ident.name.as_str();
-            
+
             // Check DOM access
             const DOM_GLOBALS: &[&str] = &[
-                "document", "window", "navigator", "location", 
-                "localStorage", "sessionStorage", "history",
-                "screen", "alert", "confirm", "prompt"
+                "document",
+                "window",
+                "navigator",
+                "location",
+                "localStorage",
+                "sessionStorage",
+                "history",
+                "screen",
+                "alert",
+                "confirm",
+                "prompt",
             ];
-            
+
             if DOM_GLOBALS.contains(&name) {
                 if !self.allowed.dom {
                     self.linter.add_error(
@@ -109,13 +121,16 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                     self.used.dom = true;
                 }
             }
-            
+
             // Check network access
             const NET_GLOBALS: &[&str] = &[
-                "fetch", "XMLHttpRequest", "WebSocket", "EventSource",
-                "ServiceWorker"
+                "fetch",
+                "XMLHttpRequest",
+                "WebSocket",
+                "EventSource",
+                "ServiceWorker",
             ];
-            
+
             if NET_GLOBALS.contains(&name) {
                 if !self.allowed.net {
                     self.linter.add_error(
@@ -127,20 +142,26 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                     self.used.net = true;
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_identifier_reference(self, ident);
         }
-        
+
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
             // Check timer functions
             if let Expression::Identifier(ident) = &call.callee {
                 const TIMER_FUNCTIONS: &[&str] = &[
-                    "setTimeout", "setInterval", "setImmediate",
-                    "requestAnimationFrame", "requestIdleCallback",
-                    "clearTimeout", "clearInterval", "clearImmediate",
-                    "cancelAnimationFrame", "cancelIdleCallback"
+                    "setTimeout",
+                    "setInterval",
+                    "setImmediate",
+                    "requestAnimationFrame",
+                    "requestIdleCallback",
+                    "clearTimeout",
+                    "clearInterval",
+                    "clearImmediate",
+                    "cancelAnimationFrame",
+                    "cancelIdleCallback",
                 ];
-                
+
                 if TIMER_FUNCTIONS.contains(&ident.name.as_str()) {
                     if !self.allowed.timers {
                         self.linter.add_error(
@@ -153,7 +174,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                     }
                 }
             }
-            
+
             // Check console access
             if let Some(member) = call.callee.as_member_expression() {
                 if let MemberExpression::StaticMemberExpression(static_member) = &member {
@@ -162,7 +183,8 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                             if !self.allowed.console {
                                 self.linter.add_error(
                                     "allow-directives".to_string(),
-                                    "Use of 'console' requires '@allow console' directive".to_string(),
+                                    "Use of 'console' requires '@allow console' directive"
+                                        .to_string(),
                                     call.span,
                                 );
                             } else {
@@ -172,10 +194,10 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                     }
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_call_expression(self, call);
         }
-        
+
         fn visit_throw_statement(&mut self, throw_stmt: &ThrowStatement<'b>) {
             // Check if throw is allowed
             if !self.allowed.throws {
@@ -200,7 +222,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                 }
             } else {
                 self.used.throws = true;
-                
+
                 // Check that only custom Error types are thrown (not plain Error)
                 if let Expression::NewExpression(new_expr) = &throw_stmt.argument {
                     if let Expression::Identifier(id) = &new_expr.callee {
@@ -228,23 +250,34 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                     );
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_throw_statement(self, throw_stmt);
         }
-        
+
         fn visit_ts_type_reference(&mut self, type_ref: &TSTypeReference<'b>) {
             if let TSTypeName::IdentifierReference(id) = &type_ref.type_name {
                 let name = id.name.as_str();
-                
+
                 // Check DOM type access
                 if !self.allowed.dom {
                     const DOM_TYPES: &[&str] = &[
-                        "HTMLElement", "HTMLDivElement", "HTMLInputElement",
-                        "Document", "Window", "Navigator", "Location",
-                        "Element", "Node", "Event", "MouseEvent", "KeyboardEvent",
-                        "DOMParser", "XMLSerializer", "Storage"
+                        "HTMLElement",
+                        "HTMLDivElement",
+                        "HTMLInputElement",
+                        "Document",
+                        "Window",
+                        "Navigator",
+                        "Location",
+                        "Element",
+                        "Node",
+                        "Event",
+                        "MouseEvent",
+                        "KeyboardEvent",
+                        "DOMParser",
+                        "XMLSerializer",
+                        "Storage",
                     ];
-                    
+
                     if DOM_TYPES.contains(&name) {
                         self.linter.add_error(
                             "allow-directives".to_string(),
@@ -253,15 +286,21 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                         );
                     }
                 }
-                
+
                 // Check network type access
                 if !self.allowed.net {
                     const NET_TYPES: &[&str] = &[
-                        "Response", "Request", "Headers", "RequestInit",
-                        "XMLHttpRequest", "WebSocket", "EventSource",
-                        "ServiceWorker", "ServiceWorkerRegistration"
+                        "Response",
+                        "Request",
+                        "Headers",
+                        "RequestInit",
+                        "XMLHttpRequest",
+                        "WebSocket",
+                        "EventSource",
+                        "ServiceWorker",
+                        "ServiceWorkerRegistration",
                     ];
-                    
+
                     if NET_TYPES.contains(&name) {
                         self.linter.add_error(
                             "allow-directives".to_string(),
@@ -271,11 +310,11 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
                     }
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_ts_type_reference(self, type_ref);
         }
     }
-    
+
     let mut visitor = AllowDirectiveVisitor {
         linter,
         allowed: allowed.clone(),
@@ -283,9 +322,9 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
         in_function: false,
         _phantom: std::marker::PhantomData,
     };
-    
+
     visitor.visit_program(program);
-    
+
     // Check for unused @allow directives
     if allowed.dom && !visitor.used.dom {
         visitor.linter.add_error(
@@ -315,7 +354,7 @@ pub fn check_allow_directives(linter: &mut Linter, program: &Program) -> UsedFea
             oxc::span::Span::new(0, 0),
         );
     }
-    
+
     visitor.used
 }
 
@@ -332,10 +371,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::from_path(Path::new("test.ts")).unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_allow_directives(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 
@@ -442,8 +481,12 @@ mod tests {
         "#;
         let errors = parse_and_check(source);
         assert!(errors.len() >= 2);
-        assert!(errors.iter().any(|e| e.contains("'MouseEvent' requires '@allow dom'")));
-        assert!(errors.iter().any(|e| e.contains("'HTMLElement' requires '@allow dom'")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("'MouseEvent' requires '@allow dom'")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("'HTMLElement' requires '@allow dom'")));
     }
 
     #[test]
@@ -455,8 +498,12 @@ mod tests {
         "#;
         let errors = parse_and_check(source);
         assert!(errors.len() >= 2);
-        assert!(errors.iter().any(|e| e.contains("'RequestInit' requires '@allow net'")));
-        assert!(errors.iter().any(|e| e.contains("'Response' requires '@allow net'")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("'RequestInit' requires '@allow net'")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("'Response' requires '@allow net'")));
     }
 
     #[test]
@@ -472,8 +519,12 @@ mod tests {
         "#;
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 2);
-        assert!(errors.iter().any(|e| e.contains("Unused '@allow dom' directive")));
-        assert!(errors.iter().any(|e| e.contains("Unused '@allow console' directive")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("Unused '@allow dom' directive")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("Unused '@allow console' directive")));
     }
 
     #[test]
@@ -505,8 +556,12 @@ mod tests {
             }
         "#;
         let errors = parse_and_check(source);
-        assert!(errors.iter().any(|e| e.contains("Unused '@allow dom' directive")));
-        assert!(errors.iter().any(|e| e.contains("Unused '@allow net' directive")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("Unused '@allow dom' directive")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("Unused '@allow net' directive")));
         assert!(!errors.iter().any(|e| e.contains("Unused '@allow console'")));
     }
 

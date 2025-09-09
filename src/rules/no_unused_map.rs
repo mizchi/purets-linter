@@ -1,12 +1,12 @@
+use crate::Linter;
 use oxc::ast::ast::*;
 use oxc::ast_visit::Visit;
-use crate::Linter;
 
 pub fn check_no_unused_map(linter: &mut Linter, program: &Program) {
     struct MapChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for MapChecker<'a> {
         fn visit_expression_statement(&mut self, stmt: &ExpressionStatement<'a>) {
             if let Expression::CallExpression(call) = &stmt.expression {
@@ -25,7 +25,7 @@ pub fn check_no_unused_map(linter: &mut Linter, program: &Program) {
             }
         }
     }
-    
+
     let mut checker = MapChecker { linter };
     checker.visit_program(program);
 }
@@ -43,10 +43,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::from_path("test.ts").unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_no_unused_map(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -56,7 +56,7 @@ mod tests {
             const numbers = [1, 2, 3];
             numbers.map(x => x * 2);
         "#;
-        
+
         let errors = parse_and_check(source);
         // TODO: Rule is working but different from expected count
         assert_eq!(errors.len(), 1); // Restored to match actual working behavior
@@ -69,7 +69,7 @@ mod tests {
             const numbers = [1, 2, 3];
             const doubled = numbers.map(x => x * 2);
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -81,7 +81,7 @@ mod tests {
                 return numbers.map(x => x * 2);
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -92,7 +92,7 @@ mod tests {
             const numbers = [1, 2, 3];
             numbers.map(x => x * 2).filter(x => x > 2);
         "#;
-        
+
         // TODO: Rule implementation issue - not detecting this specific chained map case
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior

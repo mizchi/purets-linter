@@ -5,14 +5,13 @@ use oxc::span::GetSpan;
 pub fn check_no_top_level_side_effects(linter: &mut Linter, program: &Program) {
     // Allow main() calls in main.ts files
     let path_str = linter.path.to_str().unwrap_or("");
-    let is_main_file = path_str.ends_with("/main.ts") || 
-                       path_str.ends_with("\\main.ts") || 
-                       path_str == "main.ts";
-    
+    let is_main_file =
+        path_str.ends_with("/main.ts") || path_str.ends_with("\\main.ts") || path_str == "main.ts";
+
     if linter.verbose && is_main_file {
         eprintln!("DEBUG: Detected main.ts file: {}", path_str);
     }
-    
+
     for item in &program.body {
         match item {
             Statement::ExpressionStatement(expr_stmt) => match &expr_stmt.expression {
@@ -21,12 +20,14 @@ pub fn check_no_top_level_side_effects(linter: &mut Linter, program: &Program) {
                     if is_main_file && is_main_function_call(call) {
                         continue;
                     }
-                    
+
                     // Allow Deno.test() calls in test files when using deno-test runner
-                    if is_deno_test_call(call) && linter.test_runner == Some(crate::TestRunner::DenoTest) {
+                    if is_deno_test_call(call)
+                        && linter.test_runner == Some(crate::TestRunner::DenoTest)
+                    {
                         continue;
                     }
-                    
+
                     if !is_iife(call) {
                         linter.add_error(
                             "no-top-level-side-effects".to_string(),
@@ -133,10 +134,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_top_level_side_effects(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -146,7 +147,7 @@ mod tests {
             console.log("hello");
             myFunction();
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 2);
         assert!(errors.iter().all(|e| e == "no-top-level-side-effects"));
@@ -163,7 +164,7 @@ mod tests {
                 console.log("world");
             })();
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -174,7 +175,7 @@ mod tests {
             let x = 5;
             x = 10;
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 1);
         assert!(errors.contains(&"no-top-level-side-effects".to_string()));
@@ -191,7 +192,7 @@ mod tests {
                 break;
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 2);
         assert!(errors.iter().all(|e| e == "no-top-level-side-effects"));
@@ -202,7 +203,7 @@ mod tests {
         let source = r#"
             new Date();
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 1);
         assert!(errors.contains(&"no-top-level-side-effects".to_string()));
@@ -217,7 +218,7 @@ mod tests {
             }
             export { myFunction };
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }

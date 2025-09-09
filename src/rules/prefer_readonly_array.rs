@@ -19,7 +19,15 @@ pub struct ArrayMutabilityVisitor<'a> {
 
 // Mutating array methods that change the array in-place
 const MUTATING_METHODS: &[&str] = &[
-    "push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill", "copyWithin"
+    "push",
+    "pop",
+    "shift",
+    "unshift",
+    "splice",
+    "sort",
+    "reverse",
+    "fill",
+    "copyWithin",
 ];
 
 impl<'a> ArrayMutabilityVisitor<'a> {
@@ -31,11 +39,11 @@ impl<'a> ArrayMutabilityVisitor<'a> {
             linter,
         }
     }
-    
+
     pub fn check(&mut self, program: &'a Program<'a>) {
         // First pass: collect array declarations
         self.visit_program(program);
-        
+
         // Report arrays that could be readonly
         for (name, span) in &self.array_variables {
             if !self.mutated_arrays.contains(name) && !self.readonly_arrays.contains(name) {
@@ -50,7 +58,7 @@ impl<'a> ArrayMutabilityVisitor<'a> {
             }
         }
     }
-    
+
     fn is_array_type(type_ann: &TSTypeAnnotation) -> bool {
         match &type_ann.type_annotation {
             TSType::TSArrayType(_) => true,
@@ -64,7 +72,7 @@ impl<'a> ArrayMutabilityVisitor<'a> {
             _ => false,
         }
     }
-    
+
     fn is_readonly_array_type(type_ann: &TSTypeAnnotation) -> bool {
         match &type_ann.type_annotation {
             TSType::TSTypeReference(type_ref) => {
@@ -84,7 +92,7 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
         // Check if it's an array declaration
         if let BindingPatternKind::BindingIdentifier(id) = &decl.id.kind {
             let var_name = id.name.to_string();
-            
+
             // Check if it has an array type annotation
             if let Some(type_ann) = &decl.id.type_annotation {
                 if Self::is_array_type(type_ann) {
@@ -93,7 +101,7 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
                     self.readonly_arrays.insert(var_name.clone());
                 }
             }
-            
+
             // Check if it's initialized with an array literal or Array constructor
             if let Some(init) = &decl.init {
                 match init {
@@ -124,10 +132,10 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
                 }
             }
         }
-        
+
         oxc::ast_visit::walk::walk_variable_declarator(self, decl);
     }
-    
+
     fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
         // Check for mutating method calls on tracked arrays
         if let Some(member) = call.callee.as_member_expression() {
@@ -135,7 +143,7 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
                 // Get the object being called on
                 if let Expression::Identifier(obj_id) = &static_member.object {
                     let obj_name = obj_id.name.to_string();
-                    
+
                     // Check if this is a tracked array and a mutating method
                     if self.array_variables.contains_key(&obj_name) {
                         let method_name = static_member.property.name.as_str();
@@ -146,10 +154,10 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
                 }
             }
         }
-        
+
         oxc::ast_visit::walk::walk_call_expression(self, call);
     }
-    
+
     fn visit_assignment_expression(&mut self, expr: &AssignmentExpression<'a>) {
         // Check for array element assignments like arr[0] = value
         if let AssignmentTarget::ComputedMemberExpression(member) = &expr.left {
@@ -160,7 +168,7 @@ impl<'a> Visit<'a> for ArrayMutabilityVisitor<'a> {
                 }
             }
         }
-        
+
         oxc::ast_visit::walk::walk_assignment_expression(self, expr);
     }
 }
@@ -183,10 +191,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_prefer_readonly_array(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 

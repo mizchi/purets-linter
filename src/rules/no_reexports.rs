@@ -4,21 +4,22 @@ use crate::Linter;
 
 pub fn check_no_reexports(linter: &mut Linter, program: &Program) {
     // Allow re-exports in index.ts and entry point files
-    let filename = linter.path
+    let filename = linter
+        .path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("");
-    
+
     // Check if this is an entry point file
-    let is_entry_point = filename == "index" || 
-                        linter.is_entry_point || 
-                        linter.is_main_entry;
-    
+    let is_entry_point = filename == "index" || linter.is_entry_point || linter.is_main_entry;
+
     if linter.verbose {
-        eprintln!("DEBUG no_reexports: filename={}, is_entry_point={}, is_entry={}, is_main={}", 
-                 filename, is_entry_point, linter.is_entry_point, linter.is_main_entry);
+        eprintln!(
+            "DEBUG no_reexports: filename={}, is_entry_point={}, is_entry={}, is_main={}",
+            filename, is_entry_point, linter.is_entry_point, linter.is_main_entry
+        );
     }
-    
+
     if is_entry_point {
         // For entry points, validate re-export rules:
         // 1. Must use named exports: export { name } from "..."
@@ -57,8 +58,10 @@ pub fn check_no_reexports(linter: &mut Linter, program: &Program) {
                     if export.source.is_some() && !export.specifiers.is_empty() {
                         linter.add_error(
                             "no-reexports".to_string(),
-                            format!("Re-exports from '{}' are not allowed", 
-                                export.source.as_ref().unwrap().value),
+                            format!(
+                                "Re-exports from '{}' are not allowed",
+                                export.source.as_ref().unwrap().value
+                            ),
                             export.span,
                         );
                     }
@@ -82,10 +85,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_reexports(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -94,7 +97,7 @@ mod tests {
         let source = r#"
             export * from './other.ts';
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-reexports".to_string()));
     }
@@ -104,7 +107,7 @@ mod tests {
         let source = r#"
             export { foo, bar } from './module.ts';
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-reexports".to_string()));
     }
@@ -114,7 +117,7 @@ mod tests {
         let source = r#"
             export { foo as bar } from './module.ts';
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-reexports".to_string()));
     }
@@ -129,7 +132,7 @@ mod tests {
                 return 'bar';
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -139,7 +142,7 @@ mod tests {
         let source = r#"
             export * as utils from './utils.ts';
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-reexports".to_string()));
     }

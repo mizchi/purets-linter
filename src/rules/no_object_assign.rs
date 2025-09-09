@@ -8,7 +8,7 @@ pub fn check_no_object_assign(linter: &mut Linter, program: &Program) {
     struct ObjectAssignChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for ObjectAssignChecker<'a> {
         fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
             // Check for Object.assign()
@@ -17,17 +17,18 @@ pub fn check_no_object_assign(linter: &mut Linter, program: &Program) {
                     if obj.name.as_str() == "Object" && member.property.name.as_str() == "assign" {
                         self.linter.add_error(
                             "no-object-assign".to_string(),
-                            "Object.assign is not allowed. Use spread operator (...) instead".to_string(),
+                            "Object.assign is not allowed. Use spread operator (...) instead"
+                                .to_string(),
                             call.span,
                         );
                     }
                 }
             }
-            
+
             walk::walk_call_expression(self, call);
         }
     }
-    
+
     let mut checker = ObjectAssignChecker { linter };
     checker.visit_program(program);
 }
@@ -41,7 +42,6 @@ mod tests {
     use oxc::span::SourceType;
     use std::path::Path;
 
-
     #[test]
     fn test_object_assign_usage() {
         let allocator = Allocator::default();
@@ -52,11 +52,12 @@ const result = Object.assign(target, source);
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_object_assign(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // TODO: Rule is working but different from expected count - adjust expectation
         assert_eq!(errors.len(), 1); // Restored to match actual working behavior
@@ -70,11 +71,12 @@ const merged = Object.assign({}, { x: 1 }, { y: 2 }, { z: 3 });
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_object_assign(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // TODO: Rule is working but different from expected count - adjust expectation
         assert_eq!(errors.len(), 1); // Restored to match actual working behavior
@@ -90,11 +92,12 @@ function mergeObjects(a: object, b: object) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_object_assign(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // TODO: Rule implementation issue - not detecting this specific case in function context
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior
@@ -115,11 +118,12 @@ export function mergeObjectsSpread(a: object, b: object) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_object_assign(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -136,11 +140,12 @@ function merge(a: object, b: object) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_object_assign(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // TODO: Fix no_object_assign rule implementation - currently not detecting multiple Object.assign violations
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior

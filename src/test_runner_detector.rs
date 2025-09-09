@@ -1,6 +1,6 @@
+use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TestRunner {
@@ -104,16 +104,24 @@ impl TestRunnerDetector {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                
+
                 // Check TypeScript and JavaScript test files
                 if path.is_file() {
                     if let Some(ext) = path.extension() {
-                        if ext == "ts" || ext == "js" || ext == "mjs" || ext == "tsx" || ext == "jsx" {
+                        if ext == "ts"
+                            || ext == "js"
+                            || ext == "mjs"
+                            || ext == "tsx"
+                            || ext == "jsx"
+                        {
                             if let Some(name) = path.file_name() {
                                 let name_str = name.to_string_lossy();
                                 // Check if it's a test file (Vitest pattern: .test.ts, .spec.ts)
-                                if name_str.contains(".test.") || name_str.contains(".spec.") || 
-                                   name_str.contains("_test.") || name_str.contains("_spec.") {
+                                if name_str.contains(".test.")
+                                    || name_str.contains(".spec.")
+                                    || name_str.contains("_test.")
+                                    || name_str.contains("_spec.")
+                                {
                                     if self.file_has_node_test_import(&path) {
                                         return true;
                                     }
@@ -135,12 +143,12 @@ impl TestRunnerDetector {
     fn file_has_node_test_import(&self, file_path: &Path) -> bool {
         if let Ok(content) = fs::read_to_string(file_path) {
             // Check for various forms of node:test import
-            content.contains("from \"node:test\"") ||
-            content.contains("from 'node:test'") ||
-            content.contains("require(\"node:test\")") ||
-            content.contains("require('node:test')") ||
-            content.contains("from\"node:test\"") ||
-            content.contains("from'node:test'")
+            content.contains("from \"node:test\"")
+                || content.contains("from 'node:test'")
+                || content.contains("require(\"node:test\")")
+                || content.contains("require('node:test')")
+                || content.contains("from\"node:test\"")
+                || content.contains("from'node:test'")
         } else {
             false
         }
@@ -181,7 +189,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let test_dir = temp_dir.path().join("test");
         fs::create_dir(&test_dir).unwrap();
-        
+
         let test_file = r#"
 import { test } from "node:test";
 import assert from "node:assert";

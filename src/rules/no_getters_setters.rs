@@ -8,7 +8,7 @@ pub fn check_no_getters_setters(linter: &mut Linter, program: &Program) {
     struct GetterSetterChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for GetterSetterChecker<'a> {
         fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
             match method.kind {
@@ -28,10 +28,10 @@ pub fn check_no_getters_setters(linter: &mut Linter, program: &Program) {
                 }
                 _ => {}
             }
-            
+
             walk::walk_method_definition(self, method);
         }
-        
+
         fn visit_object_expression(&mut self, obj: &ObjectExpression<'a>) {
             // Check for getters/setters in object literals
             for prop in &obj.properties {
@@ -51,32 +51,33 @@ pub fn check_no_getters_setters(linter: &mut Linter, program: &Program) {
                     }
                 }
             }
-            
+
             walk::walk_object_expression(self, obj);
         }
-        
+
         fn visit_property_definition(&mut self, prop: &PropertyDefinition<'a>) {
             // Check for accessor properties in object literals
             walk::walk_property_definition(self, prop);
         }
-        
+
         fn visit_object_property(&mut self, prop: &ObjectProperty<'a>) {
             // Object property getters/setters are handled by visit_method_definition
             // This is for regular properties
             walk::walk_object_property(self, prop);
         }
-        
+
         fn visit_accessor_property(&mut self, prop: &AccessorProperty<'a>) {
             self.linter.add_error(
                 "no-getters-setters".to_string(),
-                "Accessor properties (get/set) are not allowed in pure TypeScript subset".to_string(),
+                "Accessor properties (get/set) are not allowed in pure TypeScript subset"
+                    .to_string(),
                 prop.span,
             );
-            
+
             walk::walk_accessor_property(self, prop);
         }
     }
-    
+
     let mut checker = GetterSetterChecker { linter };
     checker.visit_program(program);
 }
@@ -94,10 +95,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_getters_setters(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -112,7 +113,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.iter().any(|e| e.contains("getter")));
     }
@@ -128,7 +129,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         // TODO: Fix no_getters_setters rule implementation - currently not detecting setter violations
         let errors = parse_and_check(source);
         assert!(errors.is_empty()); // Adjusted to match actual behavior
@@ -147,7 +148,7 @@ mod tests {
                 }
             };
         "#;
-        
+
         let errors = parse_and_check(source);
         // Should have errors for both getter and setter
         assert!(!errors.is_empty());
@@ -165,7 +166,7 @@ mod tests {
                 }
             };
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -181,7 +182,7 @@ mod tests {
                 console.log(val);
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }

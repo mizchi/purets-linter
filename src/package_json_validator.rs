@@ -31,39 +31,39 @@ impl PackageJsonValidator {
             warnings: Vec::new(),
         }
     }
-    
+
     pub fn validate(&mut self) -> Result<()> {
         let package_json_path = if self.path.ends_with("package.json") {
             self.path.clone()
         } else {
             format!("{}/package.json", self.path)
         };
-        
+
         let path = Path::new(&package_json_path);
         if !path.exists() {
             // package.json is optional, so no error if it doesn't exist
             return Ok(());
         }
-        
-        let content = fs::read_to_string(path)
-            .context("Failed to read package.json")?;
-        
-        let package_json: PackageJson = serde_json::from_str(&content)
-            .context("Failed to parse package.json")?;
-        
+
+        let content = fs::read_to_string(path).context("Failed to read package.json")?;
+
+        let package_json: PackageJson =
+            serde_json::from_str(&content).context("Failed to parse package.json")?;
+
         self.validate_module_type(&package_json);
-        
+
         Ok(())
     }
-    
+
     fn validate_module_type(&mut self, package_json: &PackageJson) {
         match &package_json.module_type {
             None => {
-                self.errors.push("\"type\": \"module\" is missing in package.json".to_string());
+                self.errors
+                    .push("\"type\": \"module\" is missing in package.json".to_string());
             }
             Some(module_type) if module_type != "module" => {
                 self.errors.push(format!(
-                    "\"type\" must be \"module\", found \"{}\"", 
+                    "\"type\" must be \"module\", found \"{}\"",
                     module_type
                 ));
             }
@@ -72,10 +72,11 @@ impl PackageJsonValidator {
             }
         }
     }
-    
+
     pub fn report(&self) {
         if !self.errors.is_empty() {
-            eprintln!("\n{} {} in package.json:", 
+            eprintln!(
+                "\n{} {} in package.json:",
                 "✗".red().bold(),
                 "Errors".red().bold()
             );
@@ -83,9 +84,10 @@ impl PackageJsonValidator {
                 eprintln!("  {} {}", "•".red(), error);
             }
         }
-        
+
         if !self.warnings.is_empty() {
-            eprintln!("\n{} {} in package.json:", 
+            eprintln!(
+                "\n{} {} in package.json:",
                 "⚠".yellow().bold(),
                 "Warnings".yellow().bold()
             );
@@ -93,12 +95,12 @@ impl PackageJsonValidator {
                 eprintln!("  {} {}", "•".yellow(), warning);
             }
         }
-        
+
         if self.errors.is_empty() && self.warnings.is_empty() {
             println!("{} package.json validation passed", "✓".green().bold());
         }
     }
-    
+
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }

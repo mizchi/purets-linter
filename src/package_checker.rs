@@ -7,7 +7,7 @@ const FORBIDDEN_LIBRARIES: &[&str] = &[
     "jquery",
     "lodash",
     "lodash.debounce",
-    "lodash.throttle", 
+    "lodash.throttle",
     "lodash.merge",
     "lodash-es",
     "underscore",
@@ -26,16 +26,16 @@ const PREFER_ALTERNATIVES: &[(&str, &str)] = &[
 pub fn check_package_json(project_path: &Path) -> Vec<String> {
     let mut errors = Vec::new();
     let package_json_path = project_path.join("package.json");
-    
+
     if !package_json_path.exists() {
         return errors;
     }
-    
+
     let contents = match fs::read_to_string(&package_json_path) {
         Ok(c) => c,
         Err(_) => return errors,
     };
-    
+
     let json: Value = match serde_json::from_str(&contents) {
         Ok(j) => j,
         Err(e) => {
@@ -43,13 +43,13 @@ pub fn check_package_json(project_path: &Path) -> Vec<String> {
             return errors;
         }
     };
-    
+
     // Check dependencies
     check_dependencies(&json, "dependencies", &mut errors);
     check_dependencies(&json, "devDependencies", &mut errors);
     check_dependencies(&json, "peerDependencies", &mut errors);
     check_dependencies(&json, "optionalDependencies", &mut errors);
-    
+
     errors
 }
 
@@ -63,7 +63,7 @@ fn check_dependencies(json: &Value, field: &str, errors: &mut Vec<String>) {
                     name, field
                 ));
             }
-            
+
             // Check libraries with alternatives
             for (lib, alternative) in PREFER_ALTERNATIVES {
                 if name == lib {
@@ -98,9 +98,9 @@ mod tests {
                 "rxjs": "^7.5.0"
             }
         }"#;
-        
+
         fs::write(temp_dir.path().join("package.json"), package_json).unwrap();
-        
+
         let errors = check_package_json(temp_dir.path());
         assert_eq!(errors.len(), 4);
         assert!(errors.iter().any(|e| e.contains("jquery")));
@@ -119,9 +119,9 @@ mod tests {
                 "yargs": "^17.0.0"
             }
         }"#;
-        
+
         fs::write(temp_dir.path().join("package.json"), package_json).unwrap();
-        
+
         let errors = check_package_json(temp_dir.path());
         assert_eq!(errors.len(), 2);
         assert!(errors[0].contains("minimist"));
@@ -140,9 +140,9 @@ mod tests {
                 "lodash-es": "^4.17.21"
             }
         }"#;
-        
+
         fs::write(temp_dir.path().join("package.json"), package_json).unwrap();
-        
+
         let errors = check_package_json(temp_dir.path());
         assert_eq!(errors.len(), 3);
         assert!(errors.iter().any(|e| e.contains("lodash.debounce")));
@@ -161,9 +161,9 @@ mod tests {
                 "axios": "^1.0.0"
             }
         }"#;
-        
+
         fs::write(temp_dir.path().join("package.json"), package_json).unwrap();
-        
+
         let errors = check_package_json(temp_dir.path());
         assert_eq!(errors.len(), 0);
     }

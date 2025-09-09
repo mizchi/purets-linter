@@ -4,12 +4,12 @@ use crate::Linter;
 
 pub fn check_no_define_property(linter: &mut Linter, program: &Program) {
     use oxc::ast_visit::Visit;
-    
+
     struct DefinePropertyVisitor<'a, 'b> {
         linter: &'a mut Linter,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
-    
+
     impl<'a, 'b> Visit<'b> for DefinePropertyVisitor<'a, 'b> {
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
             // Check for Object.defineProperty calls
@@ -23,9 +23,10 @@ pub fn check_no_define_property(linter: &mut Linter, program: &Program) {
                                 call.span,
                             );
                         }
-                        
+
                         // Also check Object.defineProperties
-                        if obj.name == "Object" && static_member.property.name == "defineProperties" {
+                        if obj.name == "Object" && static_member.property.name == "defineProperties"
+                        {
                             self.linter.add_error(
                                 "no-define-property".to_string(),
                                 "Object.defineProperties is not allowed. Use direct property assignment or object literals instead".to_string(),
@@ -35,11 +36,11 @@ pub fn check_no_define_property(linter: &mut Linter, program: &Program) {
                     }
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_call_expression(self, call);
         }
     }
-    
+
     let mut visitor = DefinePropertyVisitor {
         linter,
         _phantom: std::marker::PhantomData,
@@ -60,10 +61,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_no_define_property(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 

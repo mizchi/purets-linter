@@ -8,35 +8,37 @@ pub fn check_no_throw(linter: &mut Linter, program: &Program) {
     struct ThrowChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for ThrowChecker<'a> {
         fn visit_throw_statement(&mut self, stmt: &ThrowStatement<'a>) {
             self.linter.add_error(
                 "no-throw".to_string(),
-                "Throwing exceptions is not allowed. Use Result type from neverthrow instead".to_string(),
+                "Throwing exceptions is not allowed. Use Result type from neverthrow instead"
+                    .to_string(),
                 stmt.span,
             );
         }
-        
+
         fn visit_try_statement(&mut self, stmt: &TryStatement<'a>) {
             // First report that try-catch is not allowed
             self.linter.add_error(
                 "no-try-catch".to_string(),
-                "Try-catch blocks are not allowed. Use Result type from neverthrow instead".to_string(),
+                "Try-catch blocks are not allowed. Use Result type from neverthrow instead"
+                    .to_string(),
                 stmt.span,
             );
-            
+
             // But if try-catch is used, ensure it returns ok() in try and err() in catch
             self.check_try_block_returns(&stmt.block);
-            
+
             if let Some(handler) = &stmt.handler {
                 self.check_catch_block_returns(&handler.body);
             }
-            
+
             walk::walk_try_statement(self, stmt);
         }
     }
-    
+
     impl<'a> ThrowChecker<'a> {
         fn check_try_block_returns(&mut self, block: &BlockStatement<'a>) {
             let has_ok_return = self.block_returns_ok(block);
@@ -48,7 +50,7 @@ pub fn check_no_throw(linter: &mut Linter, program: &Program) {
                 );
             }
         }
-        
+
         fn check_catch_block_returns(&mut self, block: &BlockStatement<'a>) {
             let has_err_return = self.block_returns_err(block);
             if !has_err_return {
@@ -59,7 +61,7 @@ pub fn check_no_throw(linter: &mut Linter, program: &Program) {
                 );
             }
         }
-        
+
         fn block_returns_ok(&self, block: &BlockStatement<'a>) -> bool {
             for stmt in &block.body {
                 if let Statement::ReturnStatement(ret) = stmt {
@@ -72,7 +74,7 @@ pub fn check_no_throw(linter: &mut Linter, program: &Program) {
             }
             false
         }
-        
+
         fn block_returns_err(&self, block: &BlockStatement<'a>) -> bool {
             for stmt in &block.body {
                 if let Statement::ReturnStatement(ret) = stmt {
@@ -85,7 +87,7 @@ pub fn check_no_throw(linter: &mut Linter, program: &Program) {
             }
             false
         }
-        
+
         fn is_ok_call(&self, expr: &Expression<'a>) -> bool {
             if let Expression::CallExpression(call) = expr {
                 if let Expression::Identifier(ident) = &call.callee {
@@ -94,7 +96,7 @@ pub fn check_no_throw(linter: &mut Linter, program: &Program) {
             }
             false
         }
-        
+
         fn is_err_call(&self, expr: &Expression<'a>) -> bool {
             if let Expression::CallExpression(call) = expr {
                 if let Expression::Identifier(ident) = &call.callee {
@@ -104,7 +106,7 @@ pub fn check_no_throw(linter: &mut Linter, program: &Program) {
             false
         }
     }
-    
+
     let mut checker = ThrowChecker { linter };
     checker.visit_program(program);
 }
@@ -122,10 +124,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_throw(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -136,7 +138,7 @@ mod tests {
                 throw new Error("Something went wrong");
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-throw".to_string()));
     }
@@ -152,7 +154,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-try-catch".to_string()));
     }
@@ -169,7 +171,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"try-must-return-ok".to_string()));
     }
@@ -185,7 +187,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"catch-must-return-err".to_string()));
     }
@@ -202,7 +204,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         // Should still have no-try-catch error, but not the return errors
         assert!(errors.contains(&"no-try-catch".to_string()));
@@ -222,7 +224,7 @@ mod tests {
                 return ok(a / b);
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }

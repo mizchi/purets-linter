@@ -3,13 +3,7 @@ use oxc::ast::ast::*;
 use crate::Linter;
 
 // Libraries that should not be used
-const FORBIDDEN_LIBRARIES: &[&str] = &[
-    "jquery",
-    "lodash",
-    "lodash/fp",
-    "underscore", 
-    "rxjs",
-];
+const FORBIDDEN_LIBRARIES: &[&str] = &["jquery", "lodash", "lodash/fp", "underscore", "rxjs"];
 
 // Libraries with better alternatives
 const PREFER_ALTERNATIVES: &[(&str, &str)] = &[
@@ -19,61 +13,73 @@ const PREFER_ALTERNATIVES: &[(&str, &str)] = &[
 
 pub fn check_forbidden_libraries(linter: &mut Linter, program: &Program) {
     use oxc::ast_visit::Visit;
-    
+
     struct ForbiddenLibrariesVisitor<'a, 'b> {
         linter: &'a mut Linter,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
-    
+
     impl<'a, 'b> Visit<'b> for ForbiddenLibrariesVisitor<'a, 'b> {
         fn visit_import_declaration(&mut self, import: &ImportDeclaration<'b>) {
             let source = import.source.value.as_str();
-            
+
             // Check for forbidden libraries
             if FORBIDDEN_LIBRARIES.contains(&source) || source.starts_with("lodash/") {
                 self.linter.add_error(
                     "forbidden-libraries".to_string(),
-                    format!("Library '{}' is forbidden. Consider using modern alternatives", source),
+                    format!(
+                        "Library '{}' is forbidden. Consider using modern alternatives",
+                        source
+                    ),
                     import.span,
                 );
             }
-            
+
             // Check for libraries with better alternatives
             for (lib, alternative) in PREFER_ALTERNATIVES {
                 if source == *lib {
                     self.linter.add_error(
                         "forbidden-libraries".to_string(),
-                        format!("Library '{}' has a better alternative. Use '{}' instead", lib, alternative),
+                        format!(
+                            "Library '{}' has a better alternative. Use '{}' instead",
+                            lib, alternative
+                        ),
                         import.span,
                     );
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_import_declaration(self, import);
         }
-        
+
         fn visit_call_expression(&mut self, call: &CallExpression<'b>) {
             // Check for require() calls
             if let Expression::Identifier(ident) = &call.callee {
                 if ident.name == "require" && !call.arguments.is_empty() {
                     if let Argument::StringLiteral(lit) = &call.arguments[0] {
                         let source = lit.value.as_str();
-                        
+
                         // Check for forbidden libraries in require
                         if FORBIDDEN_LIBRARIES.contains(&source) || source.starts_with("lodash/") {
                             self.linter.add_error(
                                 "forbidden-libraries".to_string(),
-                                format!("Library '{}' is forbidden. Consider using modern alternatives", source),
+                                format!(
+                                    "Library '{}' is forbidden. Consider using modern alternatives",
+                                    source
+                                ),
                                 call.span,
                             );
                         }
-                        
+
                         // Check for libraries with better alternatives in require
                         for (lib, alternative) in PREFER_ALTERNATIVES {
                             if source == *lib {
                                 self.linter.add_error(
                                     "forbidden-libraries".to_string(),
-                                    format!("Library '{}' has a better alternative. Use '{}' instead", lib, alternative),
+                                    format!(
+                                        "Library '{}' has a better alternative. Use '{}' instead",
+                                        lib, alternative
+                                    ),
                                     call.span,
                                 );
                             }
@@ -81,11 +87,11 @@ pub fn check_forbidden_libraries(linter: &mut Linter, program: &Program) {
                     }
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_call_expression(self, call);
         }
     }
-    
+
     let mut visitor = ForbiddenLibrariesVisitor {
         linter,
         _phantom: std::marker::PhantomData,
@@ -106,10 +112,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_forbidden_libraries(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 

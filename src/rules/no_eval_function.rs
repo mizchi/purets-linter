@@ -8,7 +8,7 @@ pub fn check_no_eval_function(linter: &mut Linter, program: &Program) {
     struct EvalFunctionChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for EvalFunctionChecker<'a> {
         fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
             // Check for eval()
@@ -16,12 +16,13 @@ pub fn check_no_eval_function(linter: &mut Linter, program: &Program) {
                 if id.name.as_str() == "eval" {
                     self.linter.add_error(
                         "no-eval".to_string(),
-                        "eval() is not allowed in pure TypeScript subset due to security risks".to_string(),
+                        "eval() is not allowed in pure TypeScript subset due to security risks"
+                            .to_string(),
                         call.span,
                     );
                 }
             }
-            
+
             // Check for new Function()
             if let Expression::NewExpression(new_expr) = &call.callee {
                 if let Expression::Identifier(id) = &new_expr.callee {
@@ -34,10 +35,10 @@ pub fn check_no_eval_function(linter: &mut Linter, program: &Program) {
                     }
                 }
             }
-            
+
             walk::walk_call_expression(self, call);
         }
-        
+
         fn visit_new_expression(&mut self, new_expr: &NewExpression<'a>) {
             // Check for new Function()
             if let Expression::Identifier(id) = &new_expr.callee {
@@ -49,10 +50,10 @@ pub fn check_no_eval_function(linter: &mut Linter, program: &Program) {
                     );
                 }
             }
-            
+
             walk::walk_new_expression(self, new_expr);
         }
-        
+
         fn visit_identifier_reference(&mut self, id: &IdentifierReference) {
             // Check if eval is being used as a reference (e.g., const myEval = eval)
             if id.name.as_str() == "eval" {
@@ -64,7 +65,7 @@ pub fn check_no_eval_function(linter: &mut Linter, program: &Program) {
             }
         }
     }
-    
+
     let mut checker = EvalFunctionChecker { linter };
     checker.visit_program(program);
 }
@@ -78,7 +79,6 @@ mod tests {
     use oxc::span::SourceType;
     use std::path::Path;
 
-
     #[test]
     fn test_direct_eval_call() {
         let allocator = Allocator::default();
@@ -88,15 +88,20 @@ eval(code);
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_eval_function(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 2); // One for eval call, one for eval reference
-        assert!(errors.iter().any(|e| e.message.contains("eval() is not allowed")));
-        assert!(errors.iter().any(|e| e.message.contains("Reference to eval is not allowed")));
+        assert!(errors
+            .iter()
+            .any(|e| e.message.contains("eval() is not allowed")));
+        assert!(errors
+            .iter()
+            .any(|e| e.message.contains("Reference to eval is not allowed")));
     }
 
     #[test]
@@ -107,11 +112,12 @@ const func = new Function("x", "return x * 2");
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_eval_function(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("new Function() is not allowed"));
@@ -126,11 +132,12 @@ indirectEval("1 + 1");
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_eval_function(&mut linter, &program);
-        
+
         // TODO: Fix no_eval_function rule implementation - currently detecting 1 error instead of expected 3
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1); // Adjusted to match actual behavior
@@ -145,11 +152,12 @@ const dynamicFunc = createFunc("return 42");
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_eval_function(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // This test depends on the implementation - we may not catch Function references
         // Let's check if there are any errors related to Function constructor
@@ -174,11 +182,12 @@ const safeFuncExpr = function(a: number, b: number): number {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_eval_function(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -196,11 +205,12 @@ const dynamicFunc = new Function('a', 'b', 'return a + b');
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_eval_function(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         // Multiple violations should be caught
         assert!(errors.len() >= 3); // At least eval calls and new Function

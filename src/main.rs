@@ -13,10 +13,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use purets::{
-    check_package_json, comparer, gitignore_filter::GitignoreFilter, 
-    test_runner_detector::{TestRunnerDetector, TestRunner as DetectedTestRunner},
-    workspace_detector::WorkspaceConfig, Linter, PackageJsonValidator, 
-    TestRunner, TsConfigValidator,
+    check_package_json, comparer,
+    gitignore_filter::GitignoreFilter,
+    test_runner_detector::{TestRunner as DetectedTestRunner, TestRunnerDetector},
+    workspace_detector::WorkspaceConfig,
+    Linter, PackageJsonValidator, TestRunner, TsConfigValidator,
 };
 
 #[derive(Parser, Debug)]
@@ -60,7 +61,6 @@ struct Args {
         value_delimiter = ','
     )]
     main: Vec<String>,
-
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -91,22 +91,22 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             Command::Compare { before, after } => {
-        let before_path = Path::new(&before);
-        let after_path = Path::new(&after);
+                let before_path = Path::new(&before);
+                let after_path = Path::new(&after);
 
-        if before_path.is_file() && after_path.is_file() {
-            let comparison = comparer::compare_files(before_path, after_path)?;
-            println!("{}", comparison);
-        } else if before_path.is_dir() && after_path.is_dir() {
-            let comparisons = comparer::compare_directories(before_path, after_path)?;
-            for comparison in &comparisons {
-                println!("{}", comparison);
-            }
-            comparer::print_summary(&comparisons);
-        } else {
-            eprintln!("Error: Both paths must be either files or directories");
-            std::process::exit(1);
-        }
+                if before_path.is_file() && after_path.is_file() {
+                    let comparison = comparer::compare_files(before_path, after_path)?;
+                    println!("{}", comparison);
+                } else if before_path.is_dir() && after_path.is_dir() {
+                    let comparisons = comparer::compare_directories(before_path, after_path)?;
+                    for comparison in &comparisons {
+                        println!("{}", comparison);
+                    }
+                    comparer::print_summary(&comparisons);
+                } else {
+                    eprintln!("Error: Both paths must be either files or directories");
+                    std::process::exit(1);
+                }
                 return Ok(());
             }
         }
@@ -137,9 +137,9 @@ fn main() -> Result<()> {
     } else {
         Path::new(&path)
     };
-    
+
     let workspace_config = WorkspaceConfig::detect(project_path);
-    
+
     if workspace_config.is_monorepo() {
         println!(
             "{}",
@@ -205,7 +205,8 @@ fn main() -> Result<()> {
         }
     } else {
         // Auto-detect test runner
-        let detector = TestRunnerDetector::new(std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+        let detector =
+            TestRunnerDetector::new(std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
         let detected = detector.detect();
         match detected {
             DetectedTestRunner::Vitest => {
@@ -326,33 +327,30 @@ fn main() -> Result<()> {
 
 fn collect_files_with_workspace(workspace: &WorkspaceConfig) -> Result<Vec<PathBuf>> {
     let mut all_files = Vec::new();
-    
+
     // Initialize gitignore filter
     let mut filter = GitignoreFilter::new();
     filter.load_from_project(&workspace.root).ok();
-    
+
     // Get all target directories from workspace
     let target_dirs = workspace.get_target_dirs();
-    
+
     if workspace.is_monorepo() {
-        println!(
-            "Scanning {} package directories...",
-            target_dirs.len()
-        );
+        println!("Scanning {} package directories...", target_dirs.len());
     }
-    
+
     for dir in target_dirs {
         let files = collect_files(dir.to_str().unwrap_or("."))?;
         all_files.extend(files);
     }
-    
+
     // Remove duplicates and sort
     all_files.sort();
     all_files.dedup();
-    
+
     // Apply gitignore filtering
     let filtered_files = filter.filter_paths(all_files);
-    
+
     Ok(filtered_files)
 }
 

@@ -14,7 +14,7 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
         used_imports: HashSet<String>,
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for VariableUsageChecker<'a> {
         fn visit_import_declaration(&mut self, import: &ImportDeclaration<'a>) {
             if let Some(specifiers) = &import.specifiers {
@@ -36,7 +36,7 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
                 }
             }
         }
-        
+
         fn visit_variable_declaration(&mut self, var_decl: &VariableDeclaration<'a>) {
             for decl in &var_decl.declarations {
                 if let BindingPatternKind::BindingIdentifier(id) = &decl.id.kind {
@@ -45,7 +45,7 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
             }
             walk::walk_variable_declaration(self, var_decl);
         }
-        
+
         fn visit_function(&mut self, func: &Function<'a>, flags: ScopeFlags) {
             // Add function parameters as declared
             for param in &func.params.items {
@@ -55,7 +55,7 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
             }
             walk::walk_function(self, func, flags);
         }
-        
+
         fn visit_identifier_reference(&mut self, id: &IdentifierReference) {
             let name = id.name.as_str();
             if self.declared_vars.contains_key(name) {
@@ -66,7 +66,7 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
             }
         }
     }
-    
+
     let mut checker = VariableUsageChecker {
         declared_vars: HashMap::new(),
         used_vars: HashSet::new(),
@@ -74,9 +74,9 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
         used_imports: HashSet::new(),
         linter,
     };
-    
+
     checker.visit_program(program);
-    
+
     // Report unused variables
     for (name, span) in checker.declared_vars {
         if !checker.used_vars.contains(&name) && !name.starts_with('_') {
@@ -87,7 +87,7 @@ pub fn check_no_unused_variables(linter: &mut Linter, program: &Program) {
             );
         }
     }
-    
+
     // Report unused imports
     for (name, span) in checker.imported_vars {
         if !checker.used_imports.contains(&name) && !name.starts_with('_') {
@@ -109,7 +109,6 @@ mod tests {
     use oxc::span::SourceType;
     use std::path::Path;
 
-
     #[test]
     fn test_unused_variables() {
         let source_text = r#"
@@ -118,15 +117,20 @@ let anotherUnused = "hello";
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 2);
-        assert!(errors.iter().any(|e| e.message.contains("Variable 'unusedVar' is declared but never used")));
-        assert!(errors.iter().any(|e| e.message.contains("Variable 'anotherUnused' is declared but never used")));
+        assert!(errors.iter().any(|e| e
+            .message
+            .contains("Variable 'unusedVar' is declared but never used")));
+        assert!(errors.iter().any(|e| e
+            .message
+            .contains("Variable 'anotherUnused' is declared but never used")));
     }
 
     #[test]
@@ -136,11 +140,12 @@ const _ignoredVar = 100;
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -154,11 +159,12 @@ export function processData(data: string, unusedParam: number): string {
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         // TODO: Fix no_unused_variables rule implementation - currently not detecting violations
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior
@@ -173,11 +179,12 @@ console.log(usedVar, anotherUsed);
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -192,14 +199,17 @@ console.log(usedVar);
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1);
-        assert!(errors[0].message.contains("Variable 'unusedVar' is declared but never used"));
+        assert!(errors[0]
+            .message
+            .contains("Variable 'unusedVar' is declared but never used"));
     }
 
     #[test]
@@ -213,15 +223,20 @@ export function test() {
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 2);
-        assert!(errors.iter().any(|e| e.message.contains("Import 'bar' is declared but never used")));
-        assert!(errors.iter().any(|e| e.message.contains("Import 'defaultExport' is declared but never used")));
+        assert!(errors.iter().any(|e| e
+            .message
+            .contains("Import 'bar' is declared but never used")));
+        assert!(errors.iter().any(|e| e
+            .message
+            .contains("Import 'defaultExport' is declared but never used")));
     }
 
     #[test]
@@ -231,11 +246,12 @@ import { _ignored } from './helper';
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -251,11 +267,12 @@ export function test() {
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -274,15 +291,22 @@ export function test() {
 "#;
         let allocator = Allocator::default();
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_unused_variables(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 3); // bar, defaultExport, unusedVar
-        assert!(errors.iter().any(|e| e.message.contains("Import 'bar' is declared but never used")));
-        assert!(errors.iter().any(|e| e.message.contains("Import 'defaultExport' is declared but never used")));
-        assert!(errors.iter().any(|e| e.message.contains("Variable 'unusedVar' is declared but never used")));
+        assert!(errors.iter().any(|e| e
+            .message
+            .contains("Import 'bar' is declared but never used")));
+        assert!(errors.iter().any(|e| e
+            .message
+            .contains("Import 'defaultExport' is declared but never used")));
+        assert!(errors.iter().any(|e| e
+            .message
+            .contains("Variable 'unusedVar' is declared but never used")));
     }
 }

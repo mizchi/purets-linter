@@ -8,7 +8,7 @@ pub fn check_catch_error_handling(linter: &mut Linter, program: &Program) {
     struct CatchErrorChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for CatchErrorChecker<'a> {
         fn visit_catch_clause(&mut self, clause: &CatchClause<'a>) {
             // Check if catch has a parameter
@@ -16,7 +16,7 @@ pub fn check_catch_error_handling(linter: &mut Linter, program: &Program) {
                 // Get the parameter name if it's a simple identifier
                 if let BindingPatternKind::BindingIdentifier(ident) = &param.pattern.kind {
                     let error_name = ident.name.as_str();
-                    
+
                     // Check the catch block body for proper error handling
                     if let Some(body) = &clause.body.body.first() {
                         let has_proper_check = match body {
@@ -26,7 +26,7 @@ pub fn check_catch_error_handling(linter: &mut Linter, program: &Program) {
                             }
                             _ => false,
                         };
-                        
+
                         if !has_proper_check {
                             self.linter.add_error(
                                 "catch-error-handling".to_string(),
@@ -50,15 +50,16 @@ pub fn check_catch_error_handling(linter: &mut Linter, program: &Program) {
                 // Catch without parameter
                 self.linter.add_error(
                     "catch-error-handling".to_string(),
-                    "Catch clause must have an error parameter to handle errors properly".to_string(),
+                    "Catch clause must have an error parameter to handle errors properly"
+                        .to_string(),
                     clause.span,
                 );
             }
-            
+
             walk::walk_catch_clause(self, clause);
         }
     }
-    
+
     impl<'a> CatchErrorChecker<'a> {
         fn check_if_has_error_check(&self, if_stmt: &IfStatement<'a>, error_name: &str) -> bool {
             // Check if the condition is a call to Error.isError() or instanceof Error
@@ -96,7 +97,7 @@ pub fn check_catch_error_handling(linter: &mut Linter, program: &Program) {
             }
         }
     }
-    
+
     let mut checker = CatchErrorChecker { linter };
     checker.visit_program(program);
 }
@@ -109,7 +110,6 @@ mod tests {
     use oxc::parser::{Parser, ParserReturn};
     use oxc::span::SourceType;
     use std::path::Path;
-
 
     #[test]
     fn test_empty_catch_block() {
@@ -126,14 +126,15 @@ export function badCatch2() {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_catch_error_handling(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // TODO: Fix implementation - empty catch should be detected
-        // assert!(errors[0].message.contains("Empty catch block is not allowed"));
+                                     // assert!(errors[0].message.contains("Empty catch block is not allowed"));
     }
 
     #[test]
@@ -150,14 +151,15 @@ export function badCatch3() {
 }
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_catch_error_handling(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // TODO: Fix implementation - catch without param should be detected
-        // assert!(errors[0].message.contains("Catch clause must have an error parameter"));
+                                     // assert!(errors[0].message.contains("Catch clause must have an error parameter"));
     }
 
     #[test]
@@ -175,14 +177,15 @@ export function badCatch1() {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_catch_error_handling(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // TODO: Fix implementation
-        // assert!(errors[0].message.contains("Catch block must check error type"));
+                                     // assert!(errors[0].message.contains("Catch block must check error type"));
     }
 
     #[test]
@@ -203,11 +206,12 @@ export function goodTryCatch1() {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_catch_error_handling(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -230,11 +234,12 @@ export function goodTryCatch2() {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_catch_error_handling(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -254,13 +259,14 @@ export function badCatch() {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_catch_error_handling(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // TODO: Fix implementation
-        // assert!(errors[0].message.contains("Catch block must check error type"));
+                                     // assert!(errors[0].message.contains("Catch block must check error type"));
     }
 }

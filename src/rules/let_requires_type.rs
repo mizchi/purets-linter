@@ -8,7 +8,7 @@ pub fn check_let_requires_type(linter: &mut Linter, program: &Program) {
     struct LetTypeChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for LetTypeChecker<'a> {
         fn visit_variable_declaration(&mut self, decl: &VariableDeclaration<'a>) {
             // Only check 'let' declarations
@@ -20,18 +20,21 @@ pub fn check_let_requires_type(linter: &mut Linter, program: &Program) {
                         if let BindingPatternKind::BindingIdentifier(ident) = &declarator.id.kind {
                             self.linter.add_error(
                                 "let-requires-type".to_string(),
-                                format!("'let' declaration for '{}' must have an explicit type ", ident.name),
+                                format!(
+                                    "'let' declaration for '{}' must have an explicit type ",
+                                    ident.name
+                                ),
                                 declarator.span,
                             );
                         }
                     }
                 }
             }
-            
+
             walk::walk_variable_declaration(self, decl);
         }
     }
-    
+
     let mut checker = LetTypeChecker { linter };
     checker.visit_program(program);
 }
@@ -45,7 +48,6 @@ mod tests {
     use oxc::span::SourceType;
     use std::path::Path;
 
-
     #[test]
     fn test_let_without_type() {
         let allocator = Allocator::default();
@@ -55,14 +57,17 @@ let _bar = 42;
 let _baz = { x: 1, y: 2 };
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_let_requires_type(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 3);
-        assert!(errors.iter().all(|e| e.message.contains("must have an explicit")));
+        assert!(errors
+            .iter()
+            .all(|e| e.message.contains("must have an explicit")));
     }
 
     #[test]
@@ -74,11 +79,12 @@ let _typedNumber: number = 42;
 let _typedObject: { x: number; y: number } = { x: 1, y: 2 };
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_let_requires_type(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -92,11 +98,12 @@ const _constantNumber = 42;
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_let_requires_type(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -113,11 +120,12 @@ export function processValue(value: string): string {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_let_requires_type(&mut linter, &program);
-        
+
         // TODO: Fix let_requires_type rule implementation - currently not detecting the violation
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // Adjusted from 1 to match actual behavior

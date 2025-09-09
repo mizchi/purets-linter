@@ -1,12 +1,12 @@
+use crate::Linter;
 use oxc::ast::ast::*;
 use oxc::ast_visit::Visit;
-use crate::Linter;
 
 pub fn check_empty_array_requires_type(linter: &mut Linter, program: &Program) {
     struct ArrayChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for ArrayChecker<'a> {
         fn visit_variable_declarator(&mut self, decl: &VariableDeclarator<'a>) {
             // Check if initializer is an empty array
@@ -26,7 +26,7 @@ pub fn check_empty_array_requires_type(linter: &mut Linter, program: &Program) {
             }
         }
     }
-    
+
     let mut checker = ArrayChecker { linter };
     checker.visit_program(program);
 }
@@ -45,7 +45,7 @@ mod tests {
         let source = r#"
             const array = [];
         "#;
-        
+
         let errors = check(source);
         assert_eq!(errors.len(), 1);
         assert_errors_contain(&errors, &["Empty array 'array' requires type annotation"]);
@@ -56,7 +56,7 @@ mod tests {
         let source = r#"
             const array: Array<number> = [];
         "#;
-        
+
         let errors = check(source);
         assert_no_errors(&errors);
     }
@@ -66,7 +66,7 @@ mod tests {
         let source = r#"
             const array: number[] = [];
         "#;
-        
+
         let errors = check(source);
         assert_no_errors(&errors);
     }
@@ -76,7 +76,7 @@ mod tests {
         let source = r#"
             const array = [1, 2, 3];
         "#;
-        
+
         let errors = check(source);
         assert_no_errors(&errors);
     }
@@ -86,7 +86,7 @@ mod tests {
         let source = r#"
             let array = [];
         "#;
-        
+
         let errors = check(source);
         assert_eq!(errors.len(), 1);
         assert_errors_contain(&errors, &["Empty array 'array' requires type annotation"]);
@@ -97,7 +97,7 @@ mod tests {
         let source = r#"
             const array = [] as const;
         "#;
-        
+
         let errors = check(source);
         assert_no_errors(&errors); // TODO: const assertion handling needs review
     }

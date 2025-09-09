@@ -7,20 +7,22 @@ const MAX_PARAMS: usize = 2;
 pub fn check_max_function_params(linter: &mut Linter, program: &Program) {
     use oxc::ast_visit::Visit;
     use oxc::syntax::scope::ScopeFlags;
-    
+
     struct MaxParamsVisitor<'a, 'b> {
         linter: &'a mut Linter,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
-    
+
     impl<'a, 'b> Visit<'b> for MaxParamsVisitor<'a, 'b> {
         fn visit_function(&mut self, func: &Function<'b>, _flags: ScopeFlags) {
             let param_count = func.params.items.len();
             if param_count > MAX_PARAMS {
-                let func_name = func.id.as_ref()
+                let func_name = func
+                    .id
+                    .as_ref()
                     .map(|id| id.name.as_str())
                     .unwrap_or("<anonymous>");
-                
+
                 self.linter.add_error(
                     "max-function-params".to_string(),
                     format!(
@@ -30,10 +32,10 @@ pub fn check_max_function_params(linter: &mut Linter, program: &Program) {
                     func.span,
                 );
             }
-            
+
             oxc::ast_visit::walk::walk_function(self, func, _flags);
         }
-        
+
         fn visit_arrow_function_expression(&mut self, arrow: &ArrowFunctionExpression<'b>) {
             let param_count = arrow.params.items.len();
             if param_count > MAX_PARAMS {
@@ -46,11 +48,11 @@ pub fn check_max_function_params(linter: &mut Linter, program: &Program) {
                     arrow.span,
                 );
             }
-            
+
             oxc::ast_visit::walk::walk_arrow_function_expression(self, arrow);
         }
     }
-    
+
     let mut visitor = MaxParamsVisitor {
         linter,
         _phantom: std::marker::PhantomData,
@@ -71,10 +73,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_max_function_params(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 

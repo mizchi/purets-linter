@@ -6,7 +6,7 @@ pub mod test {
     use oxc::parser::Parser;
     use oxc::span::SourceType;
     use std::path::Path;
-    
+
     /// Parse and check with a specific rule
     pub fn check_rule<F>(source: &str, check_fn: F) -> Vec<String>
     where
@@ -19,7 +19,7 @@ pub mod test {
         check_fn(&mut linter, &ret.program);
         linter.errors.into_iter().map(|e| e.message).collect()
     }
-    
+
     /// Parse and check with a specific file path
     pub fn check_rule_with_path<F>(source: &str, path: &str, check_fn: F) -> Vec<String>
     where
@@ -32,7 +32,7 @@ pub mod test {
         check_fn(&mut linter, &ret.program);
         linter.errors.into_iter().map(|e| e.message).collect()
     }
-    
+
     /// Assert that errors contain specific messages
     pub fn assert_errors_contain(errors: &[String], expected_messages: &[&str]) {
         for msg in expected_messages {
@@ -44,7 +44,7 @@ pub mod test {
             );
         }
     }
-    
+
     /// Assert no errors
     pub fn assert_no_errors(errors: &[String]) {
         assert!(

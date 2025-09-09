@@ -8,7 +8,7 @@ pub fn check_export_const_type_required(linter: &mut Linter, program: &Program) 
     struct ExportConstChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for ExportConstChecker<'a> {
         fn visit_export_named_declaration(&mut self, decl: &ExportNamedDeclaration<'a>) {
             if let Some(declaration) = &decl.declaration {
@@ -17,12 +17,13 @@ pub fn check_export_const_type_required(linter: &mut Linter, program: &Program) 
                     if var_decl.kind == VariableDeclarationKind::Let {
                         self.linter.add_error(
                             "no-export-let".to_string(),
-                            "Export let is not allowed. Use 'export const' with explicit type ".to_string(),
+                            "Export let is not allowed. Use 'export const' with explicit type "
+                                .to_string(),
                             var_decl.span,
                         );
                         return;
                     }
-                    
+
                     // Check for export const without type annotation
                     if var_decl.kind == VariableDeclarationKind::Const {
                         for declarator in &var_decl.declarations {
@@ -30,11 +31,15 @@ pub fn check_export_const_type_required(linter: &mut Linter, program: &Program) 
                             if declarator.id.type_annotation.is_none() {
                                 // Check if it's a function (arrow functions should have type)
                                 let needs_type = if let Some(init) = &declarator.init {
-                                    !matches!(init, Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_))
+                                    !matches!(
+                                        init,
+                                        Expression::ArrowFunctionExpression(_)
+                                            | Expression::FunctionExpression(_)
+                                    )
                                 } else {
                                     true
                                 };
-                                
+
                                 if needs_type {
                                     // Get the name for error message
                                     let var_name = match &declarator.id.kind {
@@ -51,10 +56,13 @@ pub fn check_export_const_type_required(linter: &mut Linter, program: &Program) 
                                             "assignment pattern".to_string()
                                         }
                                     };
-                                    
+
                                     self.linter.add_error(
                                         "export-const-needs-type".to_string(),
-                                        format!("Export const '{}' must have an explicit type ", var_name),
+                                        format!(
+                                            "Export const '{}' must have an explicit type ",
+                                            var_name
+                                        ),
                                         declarator.span,
                                     );
                                 }
@@ -63,11 +71,11 @@ pub fn check_export_const_type_required(linter: &mut Linter, program: &Program) 
                     }
                 }
             }
-            
+
             walk::walk_export_named_declaration(self, decl);
         }
     }
-    
+
     let mut checker = ExportConstChecker { linter };
     checker.visit_program(program);
 }
@@ -81,7 +89,6 @@ mod tests {
     use oxc::span::SourceType;
     use std::path::Path;
 
-
     #[test]
     fn test_export_let_prohibited() {
         let allocator = Allocator::default();
@@ -90,11 +97,12 @@ export let mutableExport = "this should fail";
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("Export let is not allowed"));
@@ -110,14 +118,17 @@ export const untypedArray = [1, 2, 3];
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 3);
-        assert!(errors.iter().all(|e| e.message.contains("must have an explicit type ")));
+        assert!(errors
+            .iter()
+            .all(|e| e.message.contains("must have an explicit type ")));
     }
 
     #[test]
@@ -130,11 +141,12 @@ export const typedArray: readonly number[] = [1, 2, 3];
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -149,11 +161,12 @@ export function processData(data: string): string {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -167,11 +180,12 @@ export const typedArrow = (x: number): number => x * 2;
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -184,11 +198,12 @@ export const { x, y } = { x: 1, y: 2 };
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("destructured object"));
@@ -202,11 +217,12 @@ export const { a, b }: { a: number; b: number } = { a: 1, b: 2 };
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -222,14 +238,19 @@ export const { x, y } = { x: 1, y: 2 };
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_export_const_type_required(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert!(errors.len() >= 3); // At least export let and untyped const violations
-        assert!(errors.iter().any(|e| e.message.contains("Export let is not allowed")));
-        assert!(errors.iter().any(|e| e.message.contains("must have an explicit type ")));
+        assert!(errors
+            .iter()
+            .any(|e| e.message.contains("Export let is not allowed")));
+        assert!(errors
+            .iter()
+            .any(|e| e.message.contains("must have an explicit type ")));
     }
 }

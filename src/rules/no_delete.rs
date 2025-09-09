@@ -8,7 +8,7 @@ pub fn check_no_delete(linter: &mut Linter, program: &Program) {
     struct DeleteChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for DeleteChecker<'a> {
         fn visit_unary_expression(&mut self, expr: &UnaryExpression<'a>) {
             if let UnaryOperator::Delete = expr.operator {
@@ -21,7 +21,7 @@ pub fn check_no_delete(linter: &mut Linter, program: &Program) {
             walk::walk_unary_expression(self, expr);
         }
     }
-    
+
     let mut checker = DeleteChecker { linter };
     checker.visit_program(program);
 }
@@ -39,10 +39,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_delete(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -52,7 +52,7 @@ mod tests {
             const obj = { foo: 1, bar: 2 };
             delete obj.foo;
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-delete".to_string()));
     }
@@ -63,7 +63,7 @@ mod tests {
             const arr = [1, 2, 3];
             delete arr[1];
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-delete".to_string()));
     }
@@ -74,7 +74,7 @@ mod tests {
             let x = 5;
             delete x;
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-delete".to_string()));
     }
@@ -88,7 +88,7 @@ mod tests {
             const arr = [1, 2, 3];
             const filtered = arr.filter(x => x !== 2);
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -100,7 +100,7 @@ mod tests {
                 delete obj.prop;
             }
         "#;
-        
+
         // TODO: Fix no_delete rule implementation - currently not detecting delete in function
         let errors = parse_and_check(source);
         assert!(errors.is_empty()); // Adjusted to match actual behavior

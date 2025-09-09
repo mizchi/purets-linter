@@ -11,37 +11,38 @@ pub fn check_no_this_in_functions(linter: &mut Linter, program: &Program) {
         in_function: bool,
         in_arrow_function: bool,
     }
-    
+
     impl<'a> Visit<'a> for ThisChecker<'a> {
         fn visit_function(&mut self, func: &Function<'a>, flags: ScopeFlags) {
             let was_in_function = self.in_function;
             self.in_function = true;
-            
+
             walk::walk_function(self, func, flags);
-            
+
             self.in_function = was_in_function;
         }
-        
+
         fn visit_arrow_function_expression(&mut self, arrow: &ArrowFunctionExpression<'a>) {
             let was_in_arrow = self.in_arrow_function;
             self.in_arrow_function = true;
-            
+
             walk::walk_arrow_function_expression(self, arrow);
-            
+
             self.in_arrow_function = was_in_arrow;
         }
-        
+
         fn visit_this_expression(&mut self, this: &ThisExpression) {
             if self.in_function || self.in_arrow_function {
                 self.linter.add_error(
                     "no-this-in-functions".to_string(),
-                    "Using 'this' in functions is not allowed in pure TypeScript subset".to_string(),
+                    "Using 'this' in functions is not allowed in pure TypeScript subset"
+                        .to_string(),
                     this.span,
                 );
             }
         }
     }
-    
+
     let mut checker = ThisChecker {
         linter,
         in_function: false,
@@ -63,10 +64,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_this_in_functions(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -77,7 +78,7 @@ mod tests {
                 return this.value;
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-this-in-functions".to_string()));
     }
@@ -89,7 +90,7 @@ mod tests {
                 return this.value;
             };
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-this-in-functions".to_string()));
     }
@@ -104,7 +105,7 @@ mod tests {
                 return inner;
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-this-in-functions".to_string()));
     }
@@ -118,7 +119,7 @@ mod tests {
                 }
             };
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.contains(&"no-this-in-functions".to_string()));
     }
@@ -132,7 +133,7 @@ mod tests {
             
             const arrow = (x: number) => x * 2;
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -149,7 +150,7 @@ mod tests {
                 }
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         // Should have error for this usage
         assert!(errors.contains(&"no-this-in-functions".to_string()));

@@ -104,64 +104,112 @@ impl fmt::Display for MetricsComparison {
         writeln!(f, "┌─────────────────┬─────────┬─────────┬─────────┐")?;
         writeln!(f, "│ Metric          │  Before │   After │  Change │")?;
         writeln!(f, "├─────────────────┼─────────┼─────────┼─────────┤")?;
-        
-        write_row(f, "Total Lines", 
-            self.before.total_lines, 
+
+        write_row(
+            f,
+            "Total Lines",
+            self.before.total_lines,
             self.after.total_lines,
-            self.changes.total_lines_change)?;
-            
-        write_row(f, "Code Lines", 
-            self.before.code_lines, 
+            self.changes.total_lines_change,
+        )?;
+
+        write_row(
+            f,
+            "Code Lines",
+            self.before.code_lines,
             self.after.code_lines,
-            self.changes.code_lines_change)?;
-            
-        write_row(f, "Symbols", 
-            self.before.symbol_count, 
+            self.changes.code_lines_change,
+        )?;
+
+        write_row(
+            f,
+            "Symbols",
+            self.before.symbol_count,
             self.after.symbol_count,
-            self.changes.symbol_count_change)?;
-            
-        write_row(f, "Branches", 
-            self.before.branch_count, 
+            self.changes.symbol_count_change,
+        )?;
+
+        write_row(
+            f,
+            "Branches",
+            self.before.branch_count,
             self.after.branch_count,
-            self.changes.branch_count_change)?;
-            
-        writeln!(f, "│ Avg Indent      │ {:>7.2} │ {:>7.2} │ {:>+7.2} │",
+            self.changes.branch_count_change,
+        )?;
+
+        writeln!(
+            f,
+            "│ Avg Indent      │ {:>7.2} │ {:>7.2} │ {:>+7.2} │",
             self.before.average_indent_depth,
             self.after.average_indent_depth,
-            self.changes.average_indent_change)?;
-            
-        write_row(f, "Functions", 
-            self.before.function_count, 
+            self.changes.average_indent_change
+        )?;
+
+        write_row(
+            f,
+            "Functions",
+            self.before.function_count,
             self.after.function_count,
-            self.changes.function_count_change)?;
-            
+            self.changes.function_count_change,
+        )?;
+
         writeln!(f, "└─────────────────┴─────────┴─────────┴─────────┘")?;
-        
+
         writeln!(f)?;
         writeln!(f, "Summary:")?;
-        
+
         if self.changes.code_lines_change < 0 {
-            writeln!(f, "  ✓ Code reduced by {} lines", -self.changes.code_lines_change)?;
+            writeln!(
+                f,
+                "  ✓ Code reduced by {} lines",
+                -self.changes.code_lines_change
+            )?;
         } else if self.changes.code_lines_change > 0 {
-            writeln!(f, "  → Code increased by {} lines", self.changes.code_lines_change)?;
+            writeln!(
+                f,
+                "  → Code increased by {} lines",
+                self.changes.code_lines_change
+            )?;
         }
-        
+
         if self.changes.branch_count_change < 0 {
-            writeln!(f, "  ✓ Complexity reduced (branches: {})", self.changes.branch_count_change)?;
+            writeln!(
+                f,
+                "  ✓ Complexity reduced (branches: {})",
+                self.changes.branch_count_change
+            )?;
         } else if self.changes.branch_count_change > 0 {
-            writeln!(f, "  → Complexity increased (branches: +{})", self.changes.branch_count_change)?;
+            writeln!(
+                f,
+                "  → Complexity increased (branches: +{})",
+                self.changes.branch_count_change
+            )?;
         }
-        
+
         if self.changes.average_indent_change < -0.1 {
-            writeln!(f, "  ✓ Indentation improved by {:.2} levels", -self.changes.average_indent_change)?;
+            writeln!(
+                f,
+                "  ✓ Indentation improved by {:.2} levels",
+                -self.changes.average_indent_change
+            )?;
         }
-        
+
         Ok(())
     }
 }
 
-fn write_row(f: &mut fmt::Formatter<'_>, label: &str, before: usize, after: usize, change: i32) -> fmt::Result {
-    writeln!(f, "│ {:<15} │ {:>7} │ {:>7} │ {:>+7} │", label, before, after, change)
+fn write_row(
+    f: &mut fmt::Formatter<'_>,
+    label: &str,
+    before: usize,
+    after: usize,
+    change: i32,
+) -> fmt::Result {
+    writeln!(
+        f,
+        "│ {:<15} │ {:>7} │ {:>7} │ {:>+7} │",
+        label, before, after, change
+    )
 }
 
 #[cfg(test)]
@@ -197,7 +245,7 @@ mod tests {
         after.function_count = 3;
 
         let changes = MetricChanges::calculate(&before, &after);
-        
+
         assert_eq!(changes.total_lines_change, -25);
         assert_eq!(changes.code_lines_change, -20);
         assert_eq!(changes.symbol_count_change, -5);
@@ -213,7 +261,7 @@ mod tests {
         metrics.code_lines = 80;
         metrics.blank_lines = 15;
         metrics.comment_lines = 5;
-        
+
         let display = format!("{}", metrics);
         assert!(display.contains("test.ts"));
         assert!(display.contains("100"));
@@ -225,14 +273,18 @@ mod tests {
         let mut before = CodeMetrics::new("before.ts".to_string());
         before.total_lines = 100;
         before.code_lines = 80;
-        
+
         let mut after = CodeMetrics::new("after.ts".to_string());
         after.total_lines = 75;
         after.code_lines = 60;
-        
+
         let changes = MetricChanges::calculate(&before, &after);
-        let comparison = MetricsComparison { before, after, changes };
-        
+        let comparison = MetricsComparison {
+            before,
+            after,
+            changes,
+        };
+
         let display = format!("{}", comparison);
         assert!(display.contains("Code Metrics Comparison"));
         assert!(display.contains("100"));

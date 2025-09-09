@@ -18,18 +18,12 @@ impl TestRunner {
             _ => None,
         }
     }
-    
+
     /// Get the expected import patterns for this test runner
     pub fn get_import_patterns(&self) -> Vec<&'static str> {
         match self {
-            TestRunner::Vitest => vec![
-                "vitest",
-                "@vitest/",
-            ],
-            TestRunner::NodeTest => vec![
-                "node:test",
-                "node:assert",
-            ],
+            TestRunner::Vitest => vec!["vitest", "@vitest/"],
+            TestRunner::NodeTest => vec!["node:test", "node:assert"],
             TestRunner::DenoTest => vec![
                 "deno.land/std/testing",
                 "deno.land/std/assert",
@@ -40,14 +34,14 @@ impl TestRunner {
             ],
         }
     }
-    
+
     /// Check if an import source matches this test runner
     pub fn matches_import(&self, import_source: &str) -> bool {
         self.get_import_patterns()
             .iter()
             .any(|pattern| import_source.contains(pattern))
     }
-    
+
     /// Get the test function names for this runner
     pub fn get_test_functions(&self) -> Vec<&'static str> {
         match self {

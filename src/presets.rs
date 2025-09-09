@@ -20,7 +20,7 @@ impl RulePreset {
             None
         }
     }
-    
+
     /// Strict preset - all rules enabled
     pub fn strict() -> Self {
         Self {

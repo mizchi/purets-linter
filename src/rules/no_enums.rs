@@ -7,7 +7,7 @@ pub fn check_no_enums(linter: &mut Linter, program: &Program) {
     struct EnumChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for EnumChecker<'a> {
         fn visit_ts_enum_declaration(&mut self, decl: &TSEnumDeclaration<'a>) {
             self.linter.add_error(
@@ -17,7 +17,7 @@ pub fn check_no_enums(linter: &mut Linter, program: &Program) {
             );
         }
     }
-    
+
     let mut checker = EnumChecker { linter };
     checker.visit_program(program);
 }
@@ -35,10 +35,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test-file.ts"), source, false);
         check_no_enums(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -51,7 +51,7 @@ mod tests {
                 Blue
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         // TODO: Fix no_enums rule implementation - currently not detecting enum violations
         assert!(errors.is_empty()); // Adjusted to match actual behavior
@@ -67,7 +67,7 @@ mod tests {
                 Right
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         // TODO: Fix no_enums rule implementation - currently not detecting enum violations
         assert!(errors.is_empty()); // Adjusted to match actual behavior
@@ -84,7 +84,7 @@ mod tests {
                 Blue: 'blue'
             } as const;
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -97,7 +97,7 @@ mod tests {
                 Inactive = "INACTIVE"
             }
         "#;
-        
+
         let errors = parse_and_check(source);
         // TODO: Fix no_enums rule implementation - currently not detecting enum violations
         assert!(errors.is_empty()); // Adjusted to match actual behavior

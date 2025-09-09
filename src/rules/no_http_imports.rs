@@ -9,7 +9,10 @@ pub fn check_no_http_imports(linter: &mut Linter, program: &Program) {
             if source.starts_with("http://") || source.starts_with("https://") {
                 linter.add_error(
                     "no-http-imports".to_string(),
-                    format!("HTTP(S) imports are not allowed. Import from '{}' is forbidden", source),
+                    format!(
+                        "HTTP(S) imports are not allowed. Import from '{}' is forbidden",
+                        source
+                    ),
                     import.span,
                 );
             }
@@ -30,10 +33,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_no_http_imports(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 

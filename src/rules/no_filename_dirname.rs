@@ -7,7 +7,7 @@ pub fn check_no_filename_dirname(linter: &mut Linter, program: &Program) {
     struct FilenameDirnameChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for FilenameDirnameChecker<'a> {
         fn visit_identifier_reference(&mut self, id: &IdentifierReference) {
             let name = id.name.as_str();
@@ -26,7 +26,7 @@ pub fn check_no_filename_dirname(linter: &mut Linter, program: &Program) {
             }
         }
     }
-    
+
     let mut checker = FilenameDirnameChecker { linter };
     checker.visit_program(program);
 }
@@ -40,7 +40,6 @@ mod tests {
     use oxc::span::SourceType;
     use std::path::Path;
 
-
     #[test]
     fn test_filename_usage() {
         let allocator = Allocator::default();
@@ -50,11 +49,12 @@ console.log("Current file:", currentFile);
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_filename_dirname(&mut linter, &program);
-        
+
         // TODO: Fix no_filename_dirname rule implementation - currently detecting 1 error instead of expected 2
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1); // Adjusted to match actual behavior
@@ -69,11 +69,12 @@ console.log("Current directory:", currentDir);
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_filename_dirname(&mut linter, &program);
-        
+
         // TODO: Fix no_filename_dirname rule implementation - currently detecting 1 error instead of expected 2
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1); // Adjusted to match actual behavior
@@ -88,11 +89,12 @@ const fullPath = path.join(__dirname, 'file.ts');
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_filename_dirname(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("__dirname is not allowed"));
@@ -114,11 +116,12 @@ export function getModuleInfo() {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_filename_dirname(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -133,14 +136,27 @@ console.log(__filename, __dirname);
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_filename_dirname(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 4); // All references should be caught
-        assert!(errors.iter().filter(|e| e.message.contains("__filename")).count() >= 2);
-        assert!(errors.iter().filter(|e| e.message.contains("__dirname")).count() >= 2);
+        assert!(
+            errors
+                .iter()
+                .filter(|e| e.message.contains("__filename"))
+                .count()
+                >= 2
+        );
+        assert!(
+            errors
+                .iter()
+                .filter(|e| e.message.contains("__dirname"))
+                .count()
+                >= 2
+        );
     }
 }

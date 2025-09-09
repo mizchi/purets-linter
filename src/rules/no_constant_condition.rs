@@ -8,21 +8,24 @@ pub fn check_no_constant_condition(linter: &mut Linter, program: &Program) {
     struct ConstantConditionChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for ConstantConditionChecker<'a> {
         fn visit_if_statement(&mut self, stmt: &IfStatement<'a>) {
             if let Expression::BooleanLiteral(bool_lit) = &stmt.test {
                 self.linter.add_error(
                     "no-constant-condition".to_string(),
-                    format!("if ({}) is not allowed. Constant conditions are banned", bool_lit.value),
+                    format!(
+                        "if ({}) is not allowed. Constant conditions are banned",
+                        bool_lit.value
+                    ),
                     stmt.span,
                 );
             }
-            
+
             walk::walk_if_statement(self, stmt);
         }
     }
-    
+
     let mut checker = ConstantConditionChecker { linter };
     checker.visit_program(program);
 }
@@ -36,7 +39,6 @@ mod tests {
     use oxc::span::SourceType;
     use std::path::Path;
 
-
     #[test]
     fn test_if_true_constant_condition() {
         let allocator = Allocator::default();
@@ -47,11 +49,12 @@ if (true) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_constant_condition(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("if (true) is not allowed"));
@@ -67,11 +70,12 @@ if (false) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_constant_condition(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("if (false) is not allowed"));
@@ -90,11 +94,12 @@ function checkValue(x: number) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_constant_condition(&mut linter, &program);
-        
+
         // TODO: Fix no_constant_condition rule implementation - currently not detecting nested constant conditions
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior
@@ -111,11 +116,12 @@ if (condition) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_constant_condition(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -133,11 +139,12 @@ export function processValue(x: number) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_constant_condition(&mut linter, &program);
-        
+
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0);
     }
@@ -163,11 +170,12 @@ function checkValue(x: number) {
 
 "#;
         let source_type = SourceType::default();
-        let ParserReturn { program, .. } = Parser::new(&allocator, source_text, source_type).parse();
+        let ParserReturn { program, .. } =
+            Parser::new(&allocator, source_text, source_type).parse();
         let mut linter = Linter::new(Path::new("test-file.ts"), source_text, false);
-        
+
         check_no_constant_condition(&mut linter, &program);
-        
+
         // TODO: Fix no_constant_condition rule implementation - currently not detecting multiple constant conditions
         let errors = &linter.errors;
         assert_eq!(errors.len(), 0); // Adjusted to match actual behavior

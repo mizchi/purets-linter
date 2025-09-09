@@ -1,12 +1,12 @@
+use crate::Linter;
 use oxc::ast::ast::*;
 use oxc::ast_visit::Visit;
-use crate::Linter;
 
 pub fn check_no_mutable_record(linter: &mut Linter, program: &Program) {
     struct RecordChecker<'a> {
         linter: &'a mut Linter,
     }
-    
+
     impl<'a> Visit<'a> for RecordChecker<'a> {
         fn visit_variable_declarator(&mut self, decl: &VariableDeclarator<'a>) {
             // Check if type annotation is Record<K, V>
@@ -30,7 +30,7 @@ pub fn check_no_mutable_record(linter: &mut Linter, program: &Program) {
             }
         }
     }
-    
+
     let mut checker = RecordChecker { linter };
     checker.visit_program(program);
 }
@@ -48,10 +48,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::from_path("test.ts").unwrap();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_no_mutable_record(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.rule).collect()
     }
 
@@ -60,7 +60,7 @@ mod tests {
         let source = r#"
             const obj: Record<string, number> = {};
         "#;
-        
+
         let errors = parse_and_check(source);
         assert_eq!(errors.len(), 1);
         assert!(errors.contains(&"no-mutable-record".to_string()));
@@ -71,7 +71,7 @@ mod tests {
         let source = r#"
             const obj: Record<string, number> = { a: 1, b: 2 };
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -81,7 +81,7 @@ mod tests {
         let source = r#"
             const map = new Map<string, number>();
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -91,7 +91,7 @@ mod tests {
         let source = r#"
             const obj = {};
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }
@@ -101,7 +101,7 @@ mod tests {
         let source = r#"
             const obj: { [key: string]: number } = {};
         "#;
-        
+
         let errors = parse_and_check(source);
         assert!(errors.is_empty());
     }

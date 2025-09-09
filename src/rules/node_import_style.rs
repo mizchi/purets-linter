@@ -4,12 +4,48 @@ use crate::Linter;
 
 // Common Node.js built-in modules
 const NODE_BUILTINS: &[&str] = &[
-    "assert", "async_hooks", "buffer", "child_process", "cluster", "console",
-    "constants", "crypto", "dgram", "diagnostics_channel", "dns", "domain",
-    "events", "fs", "http", "http2", "https", "inspector", "module", "net",
-    "os", "path", "perf_hooks", "process", "punycode", "querystring",
-    "readline", "repl", "stream", "string_decoder", "sys", "timers", "tls",
-    "trace_events", "tty", "url", "util", "v8", "vm", "wasi", "worker_threads", "zlib"
+    "assert",
+    "async_hooks",
+    "buffer",
+    "child_process",
+    "cluster",
+    "console",
+    "constants",
+    "crypto",
+    "dgram",
+    "diagnostics_channel",
+    "dns",
+    "domain",
+    "events",
+    "fs",
+    "http",
+    "http2",
+    "https",
+    "inspector",
+    "module",
+    "net",
+    "os",
+    "path",
+    "perf_hooks",
+    "process",
+    "punycode",
+    "querystring",
+    "readline",
+    "repl",
+    "stream",
+    "string_decoder",
+    "sys",
+    "timers",
+    "tls",
+    "trace_events",
+    "tty",
+    "url",
+    "util",
+    "v8",
+    "vm",
+    "wasi",
+    "worker_threads",
+    "zlib",
 ];
 
 // Modules that have promise-based versions we should prefer
@@ -23,16 +59,16 @@ const PREFER_PROMISES: &[(&str, &str)] = &[
 
 pub fn check_node_import_style(linter: &mut Linter, program: &Program) {
     use oxc::ast_visit::Visit;
-    
+
     struct NodeImportVisitor<'a, 'b> {
         linter: &'a mut Linter,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
-    
+
     impl<'a, 'b> Visit<'b> for NodeImportVisitor<'a, 'b> {
         fn visit_import_declaration(&mut self, import: &ImportDeclaration<'b>) {
             let source = import.source.value.as_str();
-            
+
             // Check if it's a Node.js built-in without node: prefix
             if NODE_BUILTINS.contains(&source) {
                 self.linter.add_error(
@@ -44,7 +80,7 @@ pub fn check_node_import_style(linter: &mut Linter, program: &Program) {
                     import.span,
                 );
             }
-            
+
             // Check for modules that should use promises version
             for (old, new) in PREFER_PROMISES {
                 if source == *old || source == format!("node:{}", old).as_str() {
@@ -58,12 +94,15 @@ pub fn check_node_import_style(linter: &mut Linter, program: &Program) {
                     );
                 }
             }
-            
+
             // Check for namespace imports from node: modules
             if source.starts_with("node:") {
                 if let Some(specifiers) = &import.specifiers {
                     for spec in specifiers {
-                        if matches!(spec, ImportDeclarationSpecifier::ImportNamespaceSpecifier(_)) {
+                        if matches!(
+                            spec,
+                            ImportDeclarationSpecifier::ImportNamespaceSpecifier(_)
+                        ) {
                             self.linter.add_error(
                                 "node-import-style".to_string(),
                                 format!(
@@ -77,11 +116,11 @@ pub fn check_node_import_style(linter: &mut Linter, program: &Program) {
                     }
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_import_declaration(self, import);
         }
     }
-    
+
     let mut visitor = NodeImportVisitor {
         linter,
         _phantom: std::marker::PhantomData,
@@ -102,10 +141,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_node_import_style(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 

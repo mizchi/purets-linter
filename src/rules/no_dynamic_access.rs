@@ -4,12 +4,12 @@ use crate::Linter;
 
 pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
     use oxc::ast_visit::Visit;
-    
+
     struct DynamicAccessVisitor<'a, 'b> {
         linter: &'a mut Linter,
         _phantom: std::marker::PhantomData<&'b ()>,
     }
-    
+
     impl<'a, 'b> Visit<'b> for DynamicAccessVisitor<'a, 'b> {
         fn visit_member_expression(&mut self, expr: &MemberExpression<'b>) {
             // Check for computed member expressions (bracket notation)
@@ -20,7 +20,7 @@ pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
                     Expression::StringLiteral(lit) => lit.value.parse::<i32>().is_ok(),
                     _ => false,
                 };
-                
+
                 if !is_numeric {
                     self.linter.add_error(
                         "no-dynamic-access".to_string(),
@@ -29,10 +29,10 @@ pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
                     );
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_member_expression(self, expr);
         }
-        
+
         fn visit_assignment_target(&mut self, target: &AssignmentTarget<'b>) {
             // Check for computed assignment targets like obj[key] = value
             if let AssignmentTarget::ComputedMemberExpression(computed) = target {
@@ -42,20 +42,21 @@ pub fn check_no_dynamic_access(linter: &mut Linter, program: &Program) {
                     Expression::StringLiteral(lit) => lit.value.parse::<i32>().is_ok(),
                     _ => false,
                 };
-                
+
                 if !is_numeric {
                     self.linter.add_error(
                         "no-dynamic-access".to_string(),
-                        "Dynamic property assignment is not allowed. Use dot notation instead".to_string(),
+                        "Dynamic property assignment is not allowed. Use dot notation instead"
+                            .to_string(),
                         computed.span,
                     );
                 }
             }
-            
+
             oxc::ast_visit::walk::walk_assignment_target(self, target);
         }
     }
-    
+
     let mut visitor = DynamicAccessVisitor {
         linter,
         _phantom: std::marker::PhantomData,
@@ -76,10 +77,10 @@ mod tests {
         let allocator = Allocator::default();
         let source_type = SourceType::default();
         let ret = Parser::new(&allocator, source, source_type).parse();
-        
+
         let mut linter = Linter::new(Path::new("test.ts"), source, false);
         check_no_dynamic_access(&mut linter, &ret.program);
-        
+
         linter.errors.into_iter().map(|e| e.message).collect()
     }
 
